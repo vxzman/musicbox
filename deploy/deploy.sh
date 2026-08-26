@@ -36,12 +36,19 @@ ensure_binary() {
 
 build() {
     echo "[1/5] 构建 singbox-manager..."
-    (cd "$ROOT_DIR" && go build -ldflags="-s -w" -o singbox-manager .)
+    local version build_time git_commit
+    version="$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || echo dev)"
+    build_time="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    git_commit="$(git -C "$ROOT_DIR" rev-parse --short HEAD 2>/dev/null || echo unknown)"
+    (cd "$ROOT_DIR" && go build -ldflags="-s -w \
+        -X main.version=$version \
+        -X main.buildTime=$build_time \
+        -X main.gitCommit=$git_commit" -o singbox-manager .)
     dist_files="$(find "$ROOT_DIR/web/dist" -type f 2>/dev/null | wc -l)"
     if [ "$dist_files" -le 1 ]; then
         echo "      [WARN] 前端未构建（当前为占位页）。构建方式: cd web && npm install && npm run build"
     fi
-    echo "      [OK] 二进制: $ROOT_DIR/singbox-manager"
+    echo "      [OK] 二进制: $ROOT_DIR/singbox-manager（$version @ $build_time, $git_commit）"
 }
 
 # ---------------- 安装公共部分 ----------------

@@ -60,11 +60,15 @@ singbox-manager                单一二进制
 ```bash
 # 前端（构建产物 dist/ 由后端 go:embed 内嵌）
 cd web && npm install && npm run build
-# 后端
-cd .. && go build -ldflags="-s -w" -o singbox-manager .
+# 后端（注入版本/编译时间/Git 提交，供 info 子命令展示）
+cd .. && go build -ldflags="-s -w \
+  -X main.version=$(git describe --tags --exact-match 2>/dev/null || echo dev) \
+  -X main.buildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
+  -X main.gitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" -o singbox-manager .
 ```
 
 > `web/dist/` 中保留了占位 `index.html`，未构建前端时 `go build` 也能通过（二进制将显示"前端尚未构建"提示页）。
+> `deploy/deploy.sh install` 会自动执行上述注入。
 
 ## 部署到服务器（免编译，上传哪些文件）
 
@@ -161,6 +165,7 @@ sudo certbot --nginx -d singbox.example.com
 ## 常用命令
 
 ```bash
+sudo singbox-manager info                 # 版本/编译时间/Git 提交/平台/内嵌前端（鉴别是否最新构建）
 sudo singbox-manager tun start            # 启动模式（tun|tproxy|redir-tproxy|socks|server）
 sudo singbox-manager tproxy stop          # 停止（规则自动清理）
 sudo singbox-manager status               # 各模式/单元/规则状态

@@ -1,6 +1,10 @@
 # singbox-manager
 
-sing-box 运行模式管理器：**单一 Go 二进制**（守护进程 + CLI），Vue 3 前端内嵌，透明代理规则由守护进程编排并与 `singbox@` 实例同生共死。
+**Linux 服务器上 sing-box 裸内核的透明代理模式切换器。**
+
+在 Linux 服务器直接运行 sing-box 内核（无面板、无 GUI）时，用它一键切换 tun / tproxy / redir-tproxy / socks 等透明代理模式：配套的 nftables / ip 路由规则由守护进程自动编排，并与 `singbox@` systemd 实例**同生共死**（启动即套规则、停止即清理）。
+
+实现为**单一 Go 二进制**（守护进程 + CLI），Vue 3 前端内嵌，部署只需分发一个文件。
 
 > 命名约定：内核二进制 `/usr/local/bin/sing-box` 与用户/组 `sing-box` 保留官方连字符，其余（项目名、目录、单元、配置）统一 `singbox`。
 
@@ -55,20 +59,28 @@ singbox-manager                单一二进制
 └── Google MD3 + Glass（玻璃氛围版）设计美学.md   前端设计规范
 ```
 
-## 本地构建
+## 从源码构建（git clone 之后）
+
+前置：**Go ≥ 1.22**（必须）、**Node.js ≥ 18 + npm**（仅构建前端需要；仓库自带占位页，不构建前端也能编译出可用的后端二进制）。
 
 ```bash
-# 前端（构建产物 dist/ 由后端 go:embed 内嵌）
+git clone git@github.com:vxzman/singbox-manager.git
+cd singbox-manager
+
+# 1. 构建前端（产物 web/dist 由后端 go:embed 内嵌）
 cd web && npm install && npm run build
-# 后端（注入版本/编译时间/Git 提交，供 info 子命令展示）
+
+# 2. 编译后端（注入版本/编译时间/Git 提交，供 info 子命令展示）
 cd .. && go build -ldflags="-s -w \
   -X main.version=$(git describe --tags --exact-match 2>/dev/null || echo dev) \
   -X main.buildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
   -X main.gitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" -o singbox-manager .
 ```
 
+产物为根目录下单一二进制 `singbox-manager`，可用 `./singbox-manager info` 查看版本与内嵌前端状态。
+
 > `web/dist/` 中保留了占位 `index.html`，未构建前端时 `go build` 也能通过（二进制将显示"前端尚未构建"提示页）。
-> `deploy/deploy.sh install` 会自动执行上述注入。
+> 目标机装有 Go 时也可直接 `sudo ./deploy/deploy.sh install`，它会自动完成上述构建注入。
 
 ## 部署到服务器（免编译，上传哪些文件）
 

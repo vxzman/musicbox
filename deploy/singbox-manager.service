@@ -1,0 +1,31 @@
+[Unit]
+Description=Singbox Manager - web panel and mode lifecycle daemon for sing-box
+Documentation=https://sing-box.sagernet.org
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/singbox-manager serve
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=singbox-manager
+
+# 需要 CAP_NET_ADMIN（nft 表读写、ip rule）、CAP_NET_RAW；
+# CAP_SETUID/CAP_SETGID 供 runuser 降权执行 sing-box check（配置校验）
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_KILL CAP_SETUID CAP_SETGID
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/etc/singbox /var/lib/singbox /opt/singbox-manager /run/singbox-manager
+RuntimeDirectory=singbox-manager
+RuntimeDirectoryMode=0750
+PrivateTmp=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

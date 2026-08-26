@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>singbox-manager · 前端未构建</title>
+    <style>
+      body {
+        font-family: 'Roboto', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        margin: 0;
+        background: linear-gradient(135deg, #f3e8ff 0%, #e8eaff 50%, #fce8ff 100%);
+        color: #1c1b1f;
+      }
+      .card {
+        max-width: 520px;
+        padding: 32px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.6);
+        box-shadow: 0 4px 12px rgba(103, 80, 164, 0.08), 0 12px 32px rgba(103, 80, 164, 0.06);
+      }
+      h1 {
+        font-size: 22px;
+        font-weight: 500;
+        margin: 0 0 8px;
+      }
+      p {
+        color: #49454f;
+        line-height: 1.7;
+        margin: 0 0 16px;
+      }
+      code {
+        font-family: ui-monospace, Consolas, monospace;
+        background: #eaddff;
+        color: #21005d;
+        border-radius: 6px;
+        padding: 2px 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>前端尚未构建</h1>
+      <p>当前二进制内嵌的是占位页。请先构建前端再编译后端：</p>
+      <p>
+        <code>cd web &amp;&amp; npm install &amp;&amp; npm run build</code><br />
+        <code>cd .. &amp;&amp; go build -o singbox-manager .</code>
+      </p>
+      <p>开发模式请参考 README「本地开发」章节。</p>
+    </div>
+  </body>
+</html>

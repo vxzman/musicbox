@@ -1,0 +1,27 @@
+# ─── 构建产物 ───────────────────────────────
+/singbox-manager
+
+# ─── 前端 ───────────────────────────────────
+web/node_modules/
+# dist 是构建产物；仅保留占位 index.html 使未构建前端时 go build 也能通过
+web/dist/*
+!web/dist/index.html
+
+# ─── 开发夹具（本地） ────────────────────────
+dev/singbox-manager.sock
+# 由 config sync 生成的模式配置不入库，仅保留模板
+dev/etc-singbox/config_*.json
+!dev/etc-singbox/config_generic.json
+
+# ─── 旧版 bash 参考实现（不随发布提供）───────
+bash/
+
+# ─── 编辑器 / 系统 / 杂项 ───────────────────
+.claude/
+.idea/
+.vscode/
+.DS_Store
+*.log
+*.swp
+# 根目录遗留的空 package-lock（前端锁文件在 web/ 内，正常入库）
+/package-lock.json

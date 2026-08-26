@@ -1,0 +1,1521 @@
+/* ═══════════════════════════════════════════════════════════════
+   Singbox Manager — Google MD3 + Glass（玻璃氛围版）
+   参考「Google MD3 + Glass 设计美学.md」：
+   · 紫罗兰 #6750A4 种子 · 三颗光斑氛围 · 三层玻璃体系 · 语义层级
+   · "Material You — but make it breathe."
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ─── A. 令牌：MD3 语义色 + Glass 氛围色 ─────────────────────── */
+:root {
+  /* MD3 语义色（seed #6750A4，light scheme） */
+  --md-sys-color-primary: #6750a4;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #eaddff;
+  --md-sys-color-on-primary-container: #21005d;
+  --md-sys-color-secondary: #625b71;
+  --md-sys-color-on-secondary: #ffffff;
+  --md-sys-color-secondary-container: #e8def8;
+  --md-sys-color-on-secondary-container: #1d192b;
+  --md-sys-color-tertiary: #7d5260;
+  --md-sys-color-on-tertiary: #ffffff;
+  --md-sys-color-tertiary-container: #ffd8e4;
+  --md-sys-color-on-tertiary-container: #31111d;
+  --md-sys-color-error: #b3261e;
+  --md-sys-color-on-error: #ffffff;
+  --md-sys-color-error-container: #f9dedc;
+  --md-sys-color-on-error-container: #410e0b;
+  --md-sys-color-background: #fef7ff;
+  --md-sys-color-on-background: #1d1b20;
+  --md-sys-color-surface: #fef7ff;
+  --md-sys-color-on-surface: #1d1b20;
+  --md-sys-color-surface-variant: #e7e0ec;
+  --md-sys-color-on-surface-variant: #49454f;
+  --md-sys-color-outline: #79747e;
+  --md-sys-color-outline-variant: #cac4d0;
+  --md-sys-color-inverse-surface: #322f35;
+  --md-sys-color-inverse-on-surface: #f5eff7;
+  --md-sys-color-surface-tint: #6750a4;
+
+  /* Glass 氛围层（Level 1 · 环境光） */
+  --glass-surface: rgba(255, 255, 255, 0.5);
+  --glass-surface-strong: rgba(255, 255, 255, 0.68); /* 供 color-mix 使用，保持纯色 */
+  --glass-surface-text: rgba(255, 255, 255, 0.82); /* 文本输入区：更高不透明度 */
+  /* 渐变玻璃：左上高光 → 右下通透，模拟厚玻璃的明暗走向 */
+  --glass-gradient: linear-gradient(155deg, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.42) 100%);
+  --glass-gradient-strong: linear-gradient(155deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 255, 255, 0.56) 100%);
+  --glass-nav-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.5) 100%);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-nav-border: rgba(255, 255, 255, 0.6);
+  /* 玻璃边缘光：顶部 1px 内高光 + 底部微弱反光 */
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.8), inset 0 -1px 0 rgba(255, 255, 255, 0.22);
+
+  /* 更饱和的背景渐变：白玻璃压上去才有对比 */
+  --bg-base: linear-gradient(135deg, #ecd9ff 0%, #dfe4ff 50%, #ffdcf2 100%);
+  --glow-1: radial-gradient(circle, rgba(103, 80, 164, 0.34), transparent 70%);
+  --glow-2: radial-gradient(circle, rgba(80, 120, 210, 0.28), transparent 70%);
+  --glow-3: radial-gradient(circle, rgba(210, 100, 180, 0.22), transparent 70%);
+
+  /* 玻璃卡片阴影：边缘光 + 四层外阴影（紫色越远越深，厚重感来源） */
+  --glass-shadow: var(--glass-highlight), 0 2px 6px rgba(31, 20, 60, 0.05),
+    0 8px 24px rgba(103, 80, 164, 0.12), 0 24px 56px rgba(103, 80, 164, 0.1);
+  --glass-shadow-hover: var(--glass-highlight), 0 4px 10px rgba(31, 20, 60, 0.06),
+    0 12px 32px rgba(103, 80, 164, 0.16), 0 32px 72px rgba(103, 80, 164, 0.14);
+
+  /* 墨色文本（语义层级） */
+  --ink: #1c1b1f;
+  --ink-2: #49454f;
+  --ink-3: #79747e;
+
+  /* 形状：16 卡片 / 999 按钮 / 28 对话框 */
+  --md-sys-shape-corner-small: 8px;
+  --md-sys-shape-corner-medium: 12px;
+  --md-sys-shape-corner-large: 16px;
+  --md-sys-shape-corner-extra-large: 28px;
+  --md-sys-shape-corner-full: 9999px;
+
+  /* 兼容变量（视图沿用旧类名，值统一为 MD3 Glass） */
+  --surface: var(--md-sys-color-surface);
+  --text: var(--md-sys-color-on-surface);
+  --text-2: var(--md-sys-color-on-surface-variant);
+  --text-3: var(--md-sys-color-outline);
+  --accent: var(--md-sys-color-primary);
+  --ok: #2e7d32;
+  --warn: #9a6700;
+  --err: var(--md-sys-color-error);
+  --radius: 16px;
+  --radius-sm: 8px;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Noto Sans Mono', ui-monospace, 'SF Mono', Consolas,
+    monospace;
+}
+
+/* ─── B. 字体令牌（Roboto · 中文系统回退）──────────────────── */
+:root {
+  --md-ref-typeface-brand: 'Roboto', 'Noto Sans', 'Noto Sans SC', 'Noto Sans CJK SC',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  --md-ref-typeface-plain: var(--md-ref-typeface-brand);
+  --md-ref-typeface-weight-regular: 400;
+  --md-ref-typeface-weight-medium: 500;
+  --md-ref-typeface-weight-bold: 700;
+}
+
+/* ─── C. 重置与基础 ─────────────────────────────────────────── */
+* {
+  box-sizing: border-box;
+  margin: 0;
+}
+
+html {
+  scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+body {
+  font: 400 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.25px;
+  color: var(--ink);
+  background: var(--bg-base);
+  background-attachment: fixed;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── D. 排版工具类（M3 typescale）─────────────────────────── */
+.t-display-small {
+  font: 400 36px/44px var(--md-ref-typeface-brand);
+}
+.t-headline-medium {
+  font: 400 28px/36px var(--md-ref-typeface-brand);
+}
+.t-headline-small {
+  font: 400 24px/32px var(--md-ref-typeface-brand);
+}
+.t-title-large {
+  font: 400 22px/28px var(--md-ref-typeface-brand);
+}
+.t-title-medium {
+  font: 500 16px/24px var(--md-ref-typeface-brand);
+  letter-spacing: 0.15px;
+}
+.t-title-small {
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+}
+.t-body-large {
+  font: 400 16px/24px var(--md-ref-typeface-brand);
+  letter-spacing: 0.5px;
+}
+.t-body-medium {
+  font: 400 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.25px;
+}
+.t-body-small {
+  font: 400 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+}
+.t-label-large {
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+}
+.t-label-medium {
+  font: 500 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.5px;
+}
+.t-label-small {
+  font: 500 11px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.5px;
+}
+
+/* ═══════════════ 1. 氛围背景（Level 1 — Ambient）═══════════════ */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/* 三颗主光斑：更大、更深入内容区，降低模糊使色池有形可辨
+   （卡片 backdrop-filter 才有内容可"雾化"） */
+.ambient .glow {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(48px);
+  animation: drift 26s ease-in-out infinite alternate;
+}
+
+.glow-purple {
+  width: 780px;
+  height: 780px;
+  background: var(--glow-1);
+  top: -180px;
+  left: -140px;
+}
+.glow-blue {
+  width: 640px;
+  height: 640px;
+  background: var(--glow-2);
+  top: 16%;
+  right: -160px;
+  animation-delay: -8s;
+}
+.glow-pink {
+  width: 560px;
+  height: 560px;
+  background: var(--glow-3);
+  bottom: -120px;
+  left: 18%;
+  animation-delay: -16s;
+}
+
+/* 小光斑（bokeh）：清晰边缘的色泡，玻璃卡片滑过时模糊效果立即可见 */
+.bokeh {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(2px);
+  opacity: 0.55;
+  animation: drift 18s ease-in-out infinite alternate;
+}
+.bokeh-b1 {
+  width: 150px;
+  height: 150px;
+  top: 14%;
+  left: 7%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(103, 80, 164, 0.38) 52%, transparent 72%);
+}
+.bokeh-b2 {
+  width: 96px;
+  height: 96px;
+  top: 40%;
+  right: 9%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(80, 120, 210, 0.34) 52%, transparent 72%);
+  animation-delay: -5s;
+}
+.bokeh-b3 {
+  width: 64px;
+  height: 64px;
+  bottom: 26%;
+  left: 12%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(210, 100, 180, 0.32) 52%, transparent 72%);
+  animation-delay: -11s;
+}
+.bokeh-b4 {
+  width: 110px;
+  height: 110px;
+  bottom: 10%;
+  right: 22%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(103, 80, 164, 0.3) 52%, transparent 72%);
+  animation-delay: -15s;
+}
+.bokeh-b5 {
+  width: 48px;
+  height: 48px;
+  top: 60%;
+  left: 46%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9), rgba(80, 120, 210, 0.3) 52%, transparent 72%);
+  animation-delay: -3s;
+}
+
+/* 颗粒噪点：给玻璃提供细碎纹理，模糊感（frost）最直观的来源 */
+.noise {
+  position: absolute;
+  inset: -50%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  animation: noise-shift 3.5s steps(4) infinite;
+}
+
+@keyframes drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(24px, -18px, 0) scale(1.06);
+  }
+}
+
+@keyframes noise-shift {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-2%, 1%);
+  }
+  50% {
+    transform: translate(1%, -2%);
+  }
+  75% {
+    transform: translate(-1%, 2%);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+
+/* 不支持 backdrop-filter 时的纯色回退（内容必须可读） */
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-surface,
+  .hero,
+  .stat-tile,
+  .mode-row,
+  .card,
+  .file-nav,
+  .editor-pane,
+  .editor,
+  .save-bar,
+  .nav-inner,
+  .snackbar,
+  .chip,
+  .radio-card,
+  md-outlined-segmented-button-set,
+  .bottom-nav md-navigation-bar {
+    background: #ffffff;
+  }
+}
+
+/* ═══════════════ 2. 应用外壳 ═══════════════ */
+.app {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.shell {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════ 3. 浮动胶囊导航（Level 2 — Nav）═══════════════ */
+.nav-wrap {
+  position: sticky;
+  top: 16px;
+  z-index: 100;
+  display: flex;
+  justify-content: center;
+  padding: 0 16px;
+  margin-top: 16px;
+  animation: nav-in 0.4s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.nav-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 1120px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--glass-nav-gradient);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  border: 1px solid var(--glass-nav-border);
+  box-shadow: var(--glass-highlight), 0 4px 16px rgba(103, 80, 164, 0.14),
+    0 12px 40px rgba(103, 80, 164, 0.12);
+  overflow: hidden;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding-right: 8px;
+}
+
+.logo-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+  box-shadow: 0 1px 2px rgba(103, 80, 164, 0.25);
+}
+
+.logo-text {
+  font: 500 16px/24px var(--md-ref-typeface-brand);
+  letter-spacing: 0.15px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  background: none;
+  border-radius: 999px;
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.nav-item:hover {
+  background: rgba(103, 80, 164, 0.08);
+}
+
+.nav-item.active {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: 0 1px 2px rgba(103, 80, 164, 0.2);
+}
+
+.nav-item:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+.nav-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.app-bar-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+}
+
+/* ═══════════════ 4. 按钮：全胶囊化（999px · 三档语义）───────── */
+md-filled-button,
+md-outlined-button,
+md-text-button,
+md-filled-tonal-button {
+  --md-filled-button-container-shape: 9999px;
+  --md-filled-button-container-height: 40px;
+  --md-outlined-button-container-shape: 9999px;
+  --md-outlined-button-container-height: 40px;
+  --md-text-button-container-shape: 9999px;
+  --md-text-button-container-height: 40px;
+}
+
+md-icon-button {
+  --md-icon-button-container-shape: 9999px;
+  --md-icon-button-icon-color: var(--ink-2);
+}
+
+md-linear-progress {
+  --md-linear-progress-active-indicator-color: var(--md-sys-color-primary);
+  --md-linear-progress-track-color: var(--md-sys-color-primary-container);
+}
+
+/* ═══════════════ 5. 玻璃卡片（Level 3 — Cards）══════════════ */
+.glass-surface,
+.card,
+.stat-tile,
+.mode-row,
+.hero,
+.file-nav,
+.editor-pane {
+  background: var(--glass-gradient);
+  backdrop-filter: blur(22px) saturate(175%);
+  -webkit-backdrop-filter: blur(22px) saturate(175%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+/* 悬浮抬升仅用于轻交互卡（表单卡/编辑器不抬） */
+.stat-tile:hover,
+.mode-row:hover,
+.radio-card:hover {
+  background: var(--glass-gradient-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+/* 内容型卡片内边距 */
+.card {
+  padding: 24px;
+}
+
+/* ═══════════════ 6. 芯片（M3 assist-chip）───────────────── */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-gradient);
+  backdrop-filter: blur(14px) saturate(170%);
+  -webkit-backdrop-filter: blur(14px) saturate(170%);
+  box-shadow: var(--glass-highlight), 0 2px 8px rgba(103, 80, 164, 0.08);
+  color: var(--ink-2);
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.chip .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+  flex-shrink: 0;
+}
+
+.chip--small {
+  height: 24px;
+  padding: 0 12px;
+  gap: 6px;
+  font-size: 12px;
+  letter-spacing: 0.4px;
+}
+
+.chip--ok {
+  border-color: transparent;
+  color: #1b5e20;
+  background: color-mix(in srgb, var(--ok) 16%, var(--md-sys-color-surface));
+}
+
+.chip--ok .dot {
+  animation: breathe 2.2s ease-in-out infinite;
+}
+
+.chip--err {
+  border-color: transparent;
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+}
+
+.chip--warn {
+  border-color: transparent;
+  color: #5f4700;
+  background: color-mix(in srgb, var(--warn) 20%, var(--md-sys-color-surface));
+}
+
+.chip--tonal {
+  border-color: transparent;
+  color: var(--md-sys-color-on-primary-container);
+  background: var(--md-sys-color-primary-container);
+}
+
+.chip--mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+/* ═══════════════ 7. 主区域布局 ═══════════════ */
+.main {
+  position: relative;
+  z-index: 10;
+  flex: 1;
+  width: 100%;
+  max-width: 1120px;
+  margin: 24px auto 0;
+  padding: 0 24px 88px;
+  min-width: 0;
+}
+
+/* ═══════════════ 8. 页面头部 ═══════════════ */
+.page-head {
+  margin-bottom: 24px;
+  animation: rise 0.35s ease both;
+}
+
+.page-head h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font: 400 28px/36px var(--md-ref-typeface-brand);
+  color: var(--ink);
+}
+
+.page-head h1 svg {
+  color: var(--md-sys-color-primary);
+}
+
+.page-head .sub {
+  margin-top: 6px;
+  max-width: 72ch;
+}
+
+.sub {
+  color: var(--ink-2);
+  line-height: 1.8;
+}
+
+/* ═══════════════ 9. 状态页：Hero / 统计条 / 模式行 ═══════════════ */
+.hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 28px;
+  margin-bottom: 16px;
+  animation: rise 0.35s ease both;
+}
+
+/* 氛围叠加：模式色从右上角渗入，不抢文字 */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+      140% 240% at 88% -20%,
+      color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 16%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(120% 200% at -10% 120%, rgba(255, 255, 255, 0.55), transparent 60%);
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative;
+}
+
+.hero-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--mode-color, var(--md-sys-color-primary));
+  background: color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 14%, #ffffff);
+  box-shadow: 0 1px 2px rgba(103, 80, 164, 0.12);
+}
+
+.hero-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-title {
+  font: 400 24px/32px var(--md-ref-typeface-brand);
+  color: var(--ink);
+}
+
+.hero-sub {
+  margin-top: 4px;
+  color: var(--ink-2);
+}
+
+.hero > .chip {
+  flex-shrink: 0;
+}
+
+/* 统计条 */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 18px;
+  animation: rise 0.35s ease both;
+}
+
+.stat-tile .stat-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+}
+
+.stat-tile .stat-ic {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--md-sys-color-primary);
+  background: var(--md-sys-color-primary-container);
+}
+
+.stat-tile.ok .stat-ic {
+  color: #1b5e20;
+  background: color-mix(in srgb, var(--ok) 16%, #ffffff);
+}
+
+.stat-tile.err .stat-ic {
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+}
+
+.stat-tile .stat-value {
+  font: 400 24px/32px var(--md-ref-typeface-brand);
+  color: var(--ink);
+}
+
+.stat-tile.ok .stat-value {
+  color: var(--ok);
+}
+.stat-tile.err .stat-value {
+  color: var(--md-sys-color-error);
+}
+
+/* 模式列表 */
+.mode-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mode-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  animation: rise 0.35s ease both;
+}
+
+/* 活跃行：mode-color 渐变底色 + 2px 内描边（无布局跳动） */
+.mode-row.active {
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--mode-color) 8%, rgba(255, 255, 255, 0.8)) 0%,
+    color-mix(in srgb, var(--mode-color) 5%, rgba(255, 255, 255, 0.6)) 100%
+  );
+  outline: 2px solid color-mix(in srgb, var(--mode-color) 50%, transparent);
+  outline-offset: -2px;
+}
+
+.mode-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: var(--mode-color, var(--md-sys-color-primary));
+  background: color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 12%, #ffffff);
+}
+
+.mode-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.mode-body .name {
+  font: 500 16px/24px var(--md-ref-typeface-brand);
+  letter-spacing: 0.15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.mode-body .name small {
+  font: 400 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-3);
+  flex-shrink: 0;
+}
+
+/* 单行截断：任何窗口宽度下各行结构一致，芯片与按钮跨行对齐 */
+.mode-body .unit {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--ink-2);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mode-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.mode-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ═══════════════ 10. 表单 ═══════════════ */
+.field {
+  display: block;
+  margin-bottom: 16px;
+}
+
+md-outlined-text-field {
+  width: 100%;
+  --md-outlined-text-field-container-color: var(--glass-surface-text);
+  --md-outlined-text-field-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-hover-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-focus-outline-color: var(--md-sys-color-primary);
+  --md-outlined-text-field-container-shape: 12px;
+}
+
+.row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.row > .field {
+  flex: 1;
+  min-width: 170px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+.section-title svg {
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+
+.section-hint {
+  font: 500 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+  margin: 0 0 10px;
+}
+
+.hint {
+  display: block;
+  font: 400 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+  margin-top: 6px;
+  line-height: 1.6;
+}
+
+/* 单选卡片（选中 = 1px 边 + 1px inset ring，无回流） */
+.radio-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.radio-card {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass-gradient);
+  backdrop-filter: blur(22px) saturate(175%);
+  -webkit-backdrop-filter: blur(22px) saturate(175%);
+  box-shadow: var(--glass-shadow);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.radio-card:hover {
+  background: var(--glass-gradient-strong);
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+.radio-card.selected {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary), var(--glass-shadow);
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--md-sys-color-primary) 10%, rgba(255, 255, 255, 0.84)) 0%,
+    color-mix(in srgb, var(--md-sys-color-primary) 10%, rgba(255, 255, 255, 0.56)) 100%
+  );
+}
+
+.radio-card:focus-within {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.radio-text b {
+  display: block;
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+  color: var(--ink);
+}
+
+.radio-text span {
+  display: block;
+  margin-top: 2px;
+  font: 400 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+}
+
+/* 代码编辑区：shadow-DOM 输入无法直击，用组件令牌覆盖 */
+md-outlined-text-field.code {
+  --md-outlined-text-field-input-text-font: var(--font-mono);
+  --md-outlined-text-field-input-text-size: 13px;
+  --md-outlined-text-field-input-text-weight: 400;
+  --md-outlined-text-field-input-text-line-height: 21px;
+  --md-outlined-text-field-container-shape: 12px;
+  font-family: var(--font-mono);
+  white-space: pre;
+  tab-size: 2;
+}
+
+/* ═══════════════ 11. 配置页：双栏布局 ═══════════════ */
+.config-layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.file-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px;
+  align-self: start;
+}
+
+.file-nav-title {
+  padding: 6px 12px 8px;
+  font: 500 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+}
+
+.file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-family: inherit;
+  transition: background 0.15s ease;
+}
+
+.file-item:hover {
+  background: rgba(103, 80, 164, 0.08);
+}
+
+.file-item.active {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  box-shadow: 0 1px 2px rgba(103, 80, 164, 0.2);
+}
+
+.file-item:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: -2px;
+}
+
+.file-item .fi-icon {
+  flex-shrink: 0;
+}
+
+.file-item .fi-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.file-item .fi-name {
+  font: 500 14px/20px var(--md-ref-typeface-brand);
+  letter-spacing: 0.1px;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-item.active .fi-name {
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.file-item .fi-sub {
+  font: 400 12px/16px var(--md-ref-typeface-brand);
+  letter-spacing: 0.4px;
+  color: var(--ink-2);
+  margin-top: 1px;
+}
+
+.file-item.active .fi-sub {
+  color: var(--md-sys-color-on-primary-container);
+  opacity: 0.85;
+}
+
+.editor-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+}
+
+.toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.toolbar .spacer {
+  flex: 1;
+}
+
+.editor-progress {
+  display: block;
+}
+
+.editor {
+  background: var(--glass-gradient-strong);
+  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  box-shadow: var(--glass-shadow);
+  padding: 12px;
+  min-height: 540px;
+}
+
+.editor md-outlined-text-field {
+  --md-outlined-text-field-container-color: transparent;
+}
+
+.editor--readonly {
+  background: color-mix(in srgb, var(--glass-surface-strong) 70%, var(--md-sys-color-surface-variant));
+}
+
+.editor--readonly md-outlined-text-field {
+  --md-outlined-text-field-input-text-color: var(--ink-2);
+  --md-outlined-text-field-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-hover-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-focus-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-container-color: transparent;
+}
+
+/* ═══════════════ 12. 设置页 ═══════════════ */
+/* 分段选项卡：玻璃胶囊容器 + 主容器选中态 */
+.seg-wrap {
+  margin-bottom: 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.seg-wrap::-webkit-scrollbar {
+  display: none;
+}
+
+md-outlined-segmented-button-set {
+  display: flex;
+  width: 100%;
+  min-width: max-content;
+  --md-outlined-segmented-button-outline-color: var(--glass-border);
+  background: var(--glass-gradient);
+  backdrop-filter: blur(22px) saturate(175%);
+  -webkit-backdrop-filter: blur(22px) saturate(175%);
+  box-shadow: var(--glass-highlight), 0 4px 16px rgba(103, 80, 164, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+md-outlined-segmented-button {
+  --md-outlined-segmented-button-selected-container-color: var(--md-sys-color-primary-container);
+  --md-outlined-segmented-button-unselected-label-text-color: var(--ink-2);
+  --md-outlined-segmented-button-selected-label-text-color: var(--md-sys-color-on-primary-container);
+  --md-outlined-segmented-button-outline-color: var(--glass-border);
+}
+
+/* 保存栏（玻璃浮层）：与上方卡片留出呼吸间距；高不透明度保证
+   滚动时内容从栏下经过也不会糊成一团 */
+.save-bar {
+  position: sticky;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.46) 100%);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), 0 4px 16px rgba(103, 80, 164, 0.16),
+    0 12px 40px rgba(103, 80, 164, 0.14);
+}
+
+.save-bar .alert {
+  margin-top: 0;
+  flex: 1;
+}
+
+/* ═══════════════ 13. 提示条 Alert ═══════════════ */
+.alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  animation: rise 0.25s ease both;
+}
+
+.alert.ok {
+  color: #1b5e20;
+  background: color-mix(in srgb, var(--ok) 14%, var(--md-sys-color-surface));
+}
+.alert.err {
+  color: var(--md-sys-color-on-error-container);
+  background: var(--md-sys-color-error-container);
+}
+.alert svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* ═══════════════ 14. Snackbar（玻璃 · 逆表面）══════════════ */
+.snackbar {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 400px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  font-size: 14px;
+  color: var(--md-sys-color-inverse-on-surface);
+  background: linear-gradient(155deg, rgba(60, 56, 66, 0.88) 0%, rgba(45, 42, 50, 0.8) 100%);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 4px 12px rgba(0, 0, 0, 0.18),
+    0 12px 32px rgba(50, 47, 53, 0.28);
+  animation: snackbar-in 0.25s cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+.snackbar.error {
+  background: rgba(179, 38, 30, 0.88);
+  color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 状态页抬升到 FAB 上方（全局 snackbar 仅状态页触发：
+   设置页提示显示在保存栏内部，配置页提示显示在编辑器面板内） */
+.view-status .snackbar {
+  bottom: 104px;
+}
+
+.snackbar svg {
+  flex-shrink: 0;
+}
+
+/* ═══════════════ 15. FAB（56×56 · 圆角16px）────────────────── */
+.fab {
+  position: fixed;
+  right: 32px;
+  bottom: 32px;
+  z-index: 1000;
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(103, 80, 164, 0.3), 0 12px 28px rgba(103, 80, 164, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.fab:hover {
+  box-shadow: 0 6px 16px rgba(103, 80, 164, 0.35), 0 16px 36px rgba(103, 80, 164, 0.25);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+/* v-ripple 会为 FAB 添加 .ripple-host，其 position: relative 会覆盖
+   .fab 的 fixed——用更高特异性钉回 fixed */
+.fab.ripple-host {
+  position: fixed;
+}
+
+/* ═══════════════ 16. Ripple 涟漪动效 ─────────────────────────── */
+.ripple-host {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.ripple-host::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--rc, #6750a4);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.ripple-host:hover::before {
+  opacity: 0.06;
+}
+
+.ripple-host:active::before {
+  opacity: 0.12;
+}
+
+.ripple-ink {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--rc, #6750a4);
+  opacity: 0.18;
+  transform: translate(-50%, -50%) scale(0);
+  pointer-events: none;
+  z-index: 1;
+  animation: md-ripple 0.55s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+.btn-filled {
+  --rc: #ffffff;
+}
+.btn-tonal,
+.btn-outlined,
+.glass-card {
+  --rc: #6750a4;
+}
+
+/* ═══════════════ 17. 模式主题色 ═══════════════ */
+.c-tun {
+  --mode-color: #4f378b;
+}
+.c-tproxy {
+  --mode-color: #9a6700;
+}
+.c-redir-tproxy {
+  --mode-color: #8f4c38;
+}
+.c-socks {
+  --mode-color: #3a6b48;
+}
+.c-server {
+  --mode-color: #006874;
+}
+
+/* ═══════════════ 18. 底部导航 / 移动端 ═══════════ */
+.bottom-nav {
+  display: none;
+}
+
+.bottom-nav md-navigation-bar {
+  --md-navigation-bar-container-color: rgba(255, 255, 255, 0.82);
+  --md-navigation-bar-container-elevation: 0 2px 12px rgba(103, 80, 164, 0.1);
+  --md-navigation-bar-active-indicator-color: var(--md-sys-color-primary-container);
+  --md-navigation-bar-active-label-text-color: var(--md-sys-color-on-primary-container);
+  --md-navigation-bar-active-icon-color: var(--md-sys-color-on-primary-container);
+  --md-navigation-bar-inactive-label-text-color: var(--ink-2);
+  --md-navigation-bar-inactive-icon-color: var(--ink-2);
+  backdrop-filter: blur(24px) saturate(175%);
+  -webkit-backdrop-filter: blur(24px) saturate(175%);
+  border-top: 1px solid var(--glass-nav-border);
+}
+
+@media (max-width: 760px) {
+  .nav-wrap {
+    top: 8px;
+    margin-top: 8px;
+  }
+
+  .nav-inner {
+    max-width: none;
+    padding: 8px 12px;
+  }
+
+  .nav-links {
+    display: none;
+  }
+
+  .main {
+    padding: 20px 16px 120px;
+    margin-top: 16px;
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .radio-row {
+    flex-direction: column;
+  }
+  .hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  /* 模式行换行：名称行在上，芯片与按钮各占一行 */
+  .mode-row {
+    flex-wrap: wrap;
+  }
+  .mode-body {
+    flex-basis: calc(100% - 76px);
+  }
+  .mode-chips {
+    order: 3;
+    flex-basis: 100%;
+  }
+  .mode-actions {
+    order: 4;
+    flex-basis: 100%;
+  }
+  .mode-actions md-filled-button,
+  .mode-actions md-outlined-button {
+    flex: 1;
+  }
+
+  /* 配置页：导航列表转横向滚动 */
+  .config-layout {
+    grid-template-columns: 1fr;
+  }
+  .file-nav {
+    flex-direction: row;
+    overflow-x: auto;
+  }
+  .file-nav-title {
+    display: none;
+  }
+  .file-item {
+    width: auto;
+    flex-shrink: 0;
+  }
+  .file-item .fi-sub {
+    display: none;
+  }
+  .editor {
+    min-height: 380px;
+  }
+
+  .bottom-nav {
+    display: block;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 40;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .fab {
+    right: 20px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+  }
+
+  .snackbar {
+    left: 16px;
+    right: 16px;
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    max-width: none;
+  }
+  .view-status .snackbar {
+    bottom: calc(160px + env(safe-area-inset-bottom));
+  }
+
+  .save-bar {
+    bottom: calc(92px + env(safe-area-inset-bottom) + 8px);
+  }
+}
+
+/* ═══════════════ 动效 ═══════════════ */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes nav-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes md-ripple {
+  to {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0;
+  }
+}
+
+@keyframes snackbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.view-enter-active {
+  transition: opacity 0.25s cubic-bezier(0.2, 0, 0, 1), transform 0.25s cubic-bezier(0.2, 0, 0, 1);
+}
+.view-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+.view-leave-active {
+  transition: opacity 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+.view-leave-to {
+  opacity: 0;
+}

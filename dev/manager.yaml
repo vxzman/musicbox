@@ -1,0 +1,107 @@
+# dev fixture：相对目录以本文件所在位置为基准解析，避免写死机器路径
+dirs:
+  config_dir: etc-singbox
+  data_dir: /var/lib/singbox
+
+daemon:
+  web_addr: "127.0.0.1:8082"
+  cli_socket: dev/singbox-manager.sock
+  apply_delay_ms: 1000
+  reconcile_interval: 5s
+
+modes:
+  tun:
+    label: TUN
+    unit: singbox@tun
+    config: config_tun.json
+    routing:
+      rule_index: 9000
+      table_index: 2022
+    cleanup:
+      nft_tables:
+        - inet sing-box
+    preset: |
+      [
+        {
+          "type": "tun",
+          "tag": "tun-in",
+          "interface_name": "tun0",
+          "mtu": 1500,
+          "address": [
+            "172.19.0.1/30",
+            "2001:470:f9da:fdfa::1/64"
+          ],
+          "auto_route": true,
+          "auto_redirect": true,
+          "stack": "system",
+          "endpoint_independent_nat": true
+        }
+      ]
+  tproxy:
+    label: TPROXY
+    unit: singbox@tproxy
+    config: config_tproxy.json
+    env:
+      tproxy_port: 22026
+      exclude_gid: 988
+      routing_mark: 6666
+      fwmark: 1
+      table_id: 100
+      nftables_table: sing-box_tproxy4
+    preset: |
+      [
+        {
+          "type": "tproxy",
+          "tag": "tproxy-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22026,
+          "tcp_fast_open": true
+        }
+      ]
+  redir-tproxy:
+    label: REDIR-TPROXY
+    unit: singbox@redir-tproxy
+    config: config_redir-tproxy.json
+    env:
+      tproxy_port: 22026
+      redirect_port: 22025
+      exclude_gid: 988
+      routing_mark: 6666
+      fwmark: 1
+      table_id: 100
+      nftables_table: sing-box_redir_tproxy4
+    preset: |
+      [
+        {
+          "type": "redirect",
+          "tag": "rdr-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22025,
+          "tcp_fast_open": true
+        },
+        {
+          "type": "tproxy",
+          "tag": "tproxy-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22026,
+          "tcp_fast_open": true
+        }
+      ]
+  socks:
+    label: SOCKS
+    unit: singbox@socks
+    config: config_socks.json
+    preset: |
+      [
+        {
+          "type": "mixed",
+          "tag": "mixed-in",
+          "listen": "0.0.0.0",
+          "listen_port": 20080,
+          "tcp_fast_open": true
+        }
+      ]
+  server:
+    label: SERVER
+    unit: singbox@server
+    config: config_server.json

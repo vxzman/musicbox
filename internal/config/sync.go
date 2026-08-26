@@ -169,6 +169,15 @@ func buildModeConfig(general map[string]interface{}, preset string) ([]byte, err
 	return json.MarshalIndent(cfg, "", "  ")
 }
 
+// firstLine 截取输出首行：降权失败日志只留原因，不让整段输出刷屏。
+func firstLine(out []byte) string {
+	s := strings.TrimSpace(string(out))
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return s[:i]
+	}
+	return s
+}
+
 // testSingBoxConfig 用 sing-box check 校验配置；机器上没有 sing-box（如 CI）则跳过。
 // 老面板的做法：root 时以 sing-box 用户身份执行（权限问题在校验期暴露）。
 // 防挂起：整个校验包在 20s 超时内。
@@ -183,6 +192,13 @@ func testSingBoxConfig(c *ManagerConfig, content string) error {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
+
+	// MkdirTemp 目录默认 0700，root 下 runuser 降权后 sing-box 用户
+	// 无法进入目录读取配置（read config ... permission denied）；
+	// 放宽为 0755（目录名随机，无泄密风险，配置内容本就是明文 JSON）。
+	if err := os.Chmod(tmpDir, 0755); err != nil {
+		return err
+	}
 
 	tmpFile := filepath.Join(tmpDir, "config.json")
 	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
@@ -211,8 +227,8 @@ func testSingBoxConfig(c *ManagerConfig, content string) error {
 			if ctx.Err() == context.DeadlineExceeded {
 				return fmt.Errorf("配置校验超时（20s）")
 			}
-			log.Printf("[config] runuser 降权校验失败（%s），改用 root 校验: %s",
-				strings.TrimSpace(string(out)), err)
+			log.Printf("[config] runuser 降权校验不可用，改用 root 校验: %v（%s）",
+				err, strings.TrimSpace(firstLine(out)))
 		}
 	}
 

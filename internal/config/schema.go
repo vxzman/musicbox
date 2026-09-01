@@ -29,6 +29,15 @@ type Mode struct {
 	Cleanup *Cleanup `yaml:"cleanup,omitempty" json:"cleanup,omitempty"`
 	Env     *Env     `yaml:"env,omitempty" json:"env,omitempty"`
 	Preset  string   `yaml:"preset,omitempty" json:"preset,omitempty"`
+	// Endpoints 是端点模块数组（JSON），与 config_generic.json 顶层 endpoints
+	// 合并（按 tag 覆盖）生成该模式配置——EP（endpoint）模式用，如 wireguard。
+	Endpoints string `yaml:"endpoints,omitempty" json:"endpoints,omitempty"`
+}
+
+// SelfManaged 报告该模式配置是否由用户自管（server，或未配置 endpoints 的
+// EP/EBPF）：生成流程不覆盖，启停前要求用户已放置配置文件。
+func (m *Mode) SelfManaged() bool {
+	return m.Preset == "" && m.Endpoints == ""
 }
 
 // Routing 承载 tun 模式的策略路由索引：清理逻辑据此派生，不再硬编码数字。
@@ -191,10 +200,27 @@ func Default() *ManagerConfig {
 			},
 			// server 模式：配置文件由用户自行管理（config_server.json 需用户
 			// 自己放入配置目录），管理器只负责启停与监控，config sync 跳过。
+			// 配置管理页允许直接编辑保存（sing-box check 校验后写入）。
 			"server": {
 				Label:  "SERVER",
 				Unit:   "singbox@server",
 				Config: "config_server.json",
+			},
+			// EP（endpoint）模式：在 config_generic.json 基础上插入顶层
+			// endpoints 模块（与 dns/inbounds 平行，按 tag 合并）。endpoints
+			// 留空时视同用户自管——在系统设置页填入模块 JSON 后开始生成。
+			"ep": {
+				Label:  "EP",
+				Unit:   "singbox@ep",
+				Config: "config_ep.json",
+			},
+			// EBPF 模式：在 config_generic.json 基础上插入 ebpf 入站模块
+			// （测试版 sing-box 的复杂入站，类似 tun）。preset 留空时视同
+			// 用户自管——在系统设置页填入入站 JSON 后开始生成。
+			"ebpf": {
+				Label:  "EBPF",
+				Unit:   "singbox@ebpf",
+				Config: "config_ebpf.json",
 			},
 		},
 	}

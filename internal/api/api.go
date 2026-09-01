@@ -38,6 +38,7 @@ func New(cfg *config.ManagerConfig, lc *lifecycle.Manager, webFS embed.FS) (http
 	mux.HandleFunc("GET /api/config/general", a.handleGetGeneral)
 	mux.HandleFunc("PUT /api/config/general", a.handlePutGeneral)
 	mux.HandleFunc("GET /api/config/mode/{mode}", a.handleGetModeConfig)
+	mux.HandleFunc("PUT /api/config/mode/{mode}", a.handlePutModeConfig)
 
 	// ─── 系统设置（manager.yaml） ───
 	mux.HandleFunc("GET /api/settings", a.handleGetSettings)
@@ -163,6 +164,33 @@ func (a *API) handleGetModeConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"content": content})
 }
 
+// handlePutModeConfig 保存用户自管模式（server 等）的配置文件。
+// 生成型模式（有 preset/endpoints）配置由 sync 流程管理，拒绝直接写入。
+func (a *API) handlePutModeConfig(w http.ResponseWriter, r *http.Request) {
+	mode := r.PathValue("mode")
+	if !a.validMode(mode) {
+		writeErr(w, http.StatusNotFound, fmt.Errorf("未知模式: %s", mode))
+		return
+	}
+	if !a.cfg.Modes[mode].SelfManaged() {
+		writeErr(w, http.StatusBadRequest, fmt.Errorf("模式 %s 配置由生成流程管理，不可直接编辑", mode))
+		return
+	}
+	var body struct {
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeErr(w, http.StatusBadRequest, err)
+		return
+	}
+	if err := config.SaveModeConfig(a.cfg, mode, body.Content); err != nil {
+		writeErr(w, http.StatusInternalServerError, err)
+		return
+	}
+	a.publishStatus()
+	writeJSON(w, http.StatusOK, map[string]string{"ok": "true"})
+}
+
 func (a *API) validMode(mode string) bool {
 	_, ok := a.cfg.Modes[mode]
 	return ok
@@ -174,6 +202,8 @@ type modeUpdate struct {
 	Env     *config.Env     `json:"env,omitempty"`
 	Routing *config.Routing `json:"routing,omitempty"`
 	Preset  string          `json:"preset,omitempty"`
+	// Endpoints 用指针：允许清空（""）以回到用户自管模式。
+	Endpoints *string `json:"endpoints,omitempty"`
 }
 
 type settingsUpdate struct {
@@ -195,6 +225,7 @@ func (a *API) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	presetChanged := false
+	endpointsChanged := false
 	for name, up := range body.Modes {
 		md, ok := a.cfg.Modes[name]
 		if !ok || up == nil {
@@ -214,6 +245,16 @@ func (a *API) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 			md.Preset = up.Preset
 			presetChanged = true
 		}
+		if up.Endpoints != nil {
+			if *up.Endpoints != "" {
+				if err := config.ValidateEndpoints(*up.Endpoints); err != nil {
+					writeErr(w, http.StatusBadRequest, fmt.Errorf("模式 %s 端点模块无效: %w", name, err))
+					return
+				}
+			}
+			md.Endpoints = *up.Endpoints
+			endpointsChanged = true
+		}
 	}
 	if body.Daemon != nil {
 		*a.cfg = *withDaemon(a.cfg, body.Daemon)
@@ -224,8 +265,8 @@ func (a *API) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// preset/env 变化影响生成配置：同步各模式配置（通用配置存在时）。
-	if presetChanged {
+	// preset/env/endpoints 变化影响生成配置：同步各模式配置（通用配置存在时）。
+	if presetChanged || endpointsChanged {
 		if _, err := os.Stat(a.cfg.GeneralPath()); err == nil {
 			if err := config.SyncAll(a.cfg, ""); err != nil {
 				writeErr(w, http.StatusInternalServerError, err)

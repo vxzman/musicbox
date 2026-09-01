@@ -13,12 +13,12 @@
 前端遵循 [Google MD3 + Glass 设计美学](<Google MD3 + Glass（玻璃氛围版）设计美学.md>)：紫罗兰 `#6750A4` 种子色、三颗光斑氛围层、三层玻璃体系（导航胶囊 / 玻璃卡片 / 涟漪按钮），"Material You — but make it breathe."
 
 - **运行状态**：模式摘要 Hero、统计条、模式启停列表（单元状态 + 规则状态芯片，SSE 秒级刷新）
-- **配置管理**：双栏编辑器，`config_generic.json` 唯一编辑入口，各模式配置只读预览
+- **配置管理**：双栏编辑器，`config_generic.json` 是编辑入口，各模式配置只读预览；server 等用户自管模式可直接编辑保存
 - **系统设置**：分段选项卡，管理 manager.yaml（规则数字 / 环境变量 / 预定义入站）
 
 ## 特性
 
-- **5 种模式**：tun / tproxy / redir-tproxy / socks / server（server 配置文件由用户自管，管理器不生成不覆盖）
+- **7 种模式**：tun / tproxy / redir-tproxy / socks / server / ep / ebpf（server 等用户自管模式在配置页直接编辑；ep/ebpf 在系统设置页编辑模块 JSON）
 - **规则生命周期**：启动 `singbox@` 实例 → 延迟套用 nft/ip 规则 → 实例停止即清理（同生共死）；守护重启自动 reconcile 兜底；tun0 消失自动清理残留
 - **回环避免双方式**：`meta skgid`（GID，优先）或 `meta mark`（路由 mark），二选一可配置
 - **统一配置**：`/opt/singbox-manager/manager.yaml` 是规则数字 / env / 预定义入站的唯一事实源
@@ -43,7 +43,9 @@ singbox-manager                单一二进制
 | tproxy | singbox@tproxy | config_tproxy.json | tproxy 22026，fwmark 1 / table 100 / nft sing-box_tproxy4 |
 | redir-tproxy | singbox@redir-tproxy | config_redir-tproxy.json | redirect 22025 + tproxy 22026，nft sing-box_redir_tproxy4 |
 | socks | singbox@socks | config_socks.json | mixed 20080 |
-| server | singbox@server | config_server.json | **用户自管**：不生成/不覆盖/不校验，只启停与监控 |
+| server | singbox@server | config_server.json | **用户自管**：不生成/不覆盖，只启停与监控；可在配置管理页直接编辑保存 |
+| ep | singbox@ep | config_ep.json | **endpoint 模式**：通用配置顶层插入 endpoints 模块（与 dns/inbounds 平行，按 tag 合并），模块 JSON 在系统设置页编辑；留空视同用户自管 |
+| ebpf | singbox@ebpf | config_ebpf.json | **EBPF 入站**：通用配置插入 ebpf 入站模块（类似 tun 的复杂入站，测试版 sing-box），入站 JSON 在系统设置页编辑；留空视同用户自管 |
 
 ## 项目结构
 
@@ -127,6 +129,15 @@ ssh 服务器 'sudo install -m 0755 /tmp/singbox-manager /usr/local/bin/singbox-
 
 安装后检查：`/opt/singbox-manager/manager.yaml` 里 tproxy/redir-tproxy 的 `exclude_gid` 与 `id -g sing-box` 一致（不一致会环路），可在面板「系统设置」修改。
 
+### 模式配置说明（面板「系统设置」→ 各模式标签页）
+
+- **socks**：只填「入站端口」，保存后写入 `config_socks.json` 的 mixed 入站（mixed-in）`listen_port`，其余字段由预定义入站模板维护。
+- **ep**（endpoint 模式）：填写端点模块 JSON 数组，与 `config_generic.json` 顶层 `endpoints` 数组**平行合并**（与 `dns`/`inbounds` 同层级，按 tag 覆盖），生成 `config_ep.json`（如 wireguard 端点）。留空则该模式视同用户自管。
+- **ebpf**：填写 ebpf 入站模块 JSON 数组，与 `config_generic.json` 的 `inbounds` 数组合并（按 tag 覆盖），生成 `config_ebpf.json`——类似 TUN 的复杂入站，**仅测试版 sing-box 支持**。留空则该模式视同用户自管。
+- **server**：用户自管配置文件，可在面板「配置管理」页直接编辑保存（sing-box check 校验后写入）。
+
+自管模式（preset 与 endpoints 均为空）不参与配置生成：管理器不生成、不覆盖，启停前需先放置好配置文件。
+
 ## 监听地址与 IPv6（安全说明）
 
 面板无鉴权，**默认仅监听 IPv4**（`0.0.0.0:8082`，不暴露 IPv6）。在 manager.yaml 中调整：
@@ -178,11 +189,11 @@ sudo certbot --nginx -d singbox.example.com
 
 ```bash
 sudo singbox-manager info                 # 版本/编译时间/Git 提交/平台/内嵌前端（鉴别是否最新构建）
-sudo singbox-manager tun start            # 启动模式（tun|tproxy|redir-tproxy|socks|server）
+sudo singbox-manager tun start            # 启动模式（tun|tproxy|redir-tproxy|socks|server|ep|ebpf）
 sudo singbox-manager tproxy stop          # 停止（规则自动清理）
 sudo singbox-manager status               # 各模式/单元/规则状态
 sudo singbox-manager config sync          # 重新生成各模式配置（sing-box check 校验）
-# server 模式：自行放置 /etc/singbox/config_server.json 后即可启停
+# server 等自管模式：在面板「配置管理」页编辑保存，或自行放置配置文件后即可启停
 ```
 
 ## 本地开发

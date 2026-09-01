@@ -323,7 +323,6 @@ body {
 @supports not (backdrop-filter: blur(1px)) {
   .glass-surface,
   .hero,
-  .stat-tile,
   .mode-row,
   .card,
   .file-nav,
@@ -342,6 +341,8 @@ body {
 
 /* ═══════════════ 2. 应用外壳 ═══════════════ */
 .app {
+  /* 整体缩放因子：页面缩小 + 四周留白 */
+  --app-zoom: 0.94;
   position: relative;
   z-index: 1;
   display: flex;
@@ -349,11 +350,31 @@ body {
   min-height: 100vh;
 }
 
-.shell {
+/* 缩放外壳：导航 + 主内容整体缩小并居中。
+   必须用 zoom 而非 transform：transform 会让内部 sticky 元素随滚动漂移
+   （变换原点锚在元素盒上），并把 fixed 后代变成相对定位。
+   zoom: z 配合 width: calc(100% * z) → 布局宽恰好等于父级宽，
+   渲染缩小为 z 并水平居中（margin: 0 auto），四周自然留白。 */
+.app-scale {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
+}
+
+@supports (zoom: 1) {
+  .app-scale {
+    zoom: var(--app-zoom);
+    width: calc(100% * var(--app-zoom));
+    margin: 0 auto;
+  }
+
+  /* 视口固定浮层同步缩放，与页面比例一致（位于 .app-scale 之外，不继承其自定义属性） */
+  .snackbar {
+    zoom: var(--app-zoom);
+  }
 }
 
 /* ═══════════════ 3. 浮动胶囊导航（Level 2 — Nav）═══════════════ */
@@ -395,9 +416,9 @@ body {
 }
 
 .logo-mark {
-  width: 32px;
-  height: 32px;
-  border-radius: 12px;
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -491,7 +512,6 @@ md-linear-progress {
 /* ═══════════════ 5. 玻璃卡片（Level 3 — Cards）══════════════ */
 .glass-surface,
 .card,
-.stat-tile,
 .mode-row,
 .hero,
 .file-nav,
@@ -506,7 +526,6 @@ md-linear-progress {
 }
 
 /* 悬浮抬升仅用于轻交互卡（表单卡/编辑器不抬） */
-.stat-tile:hover,
 .mode-row:hover,
 .radio-card:hover {
   background: var(--glass-gradient-strong);
@@ -687,68 +706,6 @@ md-linear-progress {
   color: var(--ink-2);
 }
 
-.hero > .chip {
-  flex-shrink: 0;
-}
-
-/* 统计条 */
-.stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.stat-tile {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 18px;
-  animation: rise 0.35s ease both;
-}
-
-.stat-tile .stat-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font: 500 12px/16px var(--md-ref-typeface-brand);
-  letter-spacing: 0.4px;
-  color: var(--ink-2);
-}
-
-.stat-tile .stat-ic {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  color: var(--md-sys-color-primary);
-  background: var(--md-sys-color-primary-container);
-}
-
-.stat-tile.ok .stat-ic {
-  color: #1b5e20;
-  background: color-mix(in srgb, var(--ok) 16%, #ffffff);
-}
-
-.stat-tile.err .stat-ic {
-  color: var(--md-sys-color-on-error-container);
-  background: var(--md-sys-color-error-container);
-}
-
-.stat-tile .stat-value {
-  font: 400 24px/32px var(--md-ref-typeface-brand);
-  color: var(--ink);
-}
-
-.stat-tile.ok .stat-value {
-  color: var(--ok);
-}
-.stat-tile.err .stat-value {
-  color: var(--md-sys-color-error);
-}
-
 /* 模式列表 */
 .mode-list {
   display: flex;
@@ -834,6 +791,65 @@ md-linear-progress {
   flex-shrink: 0;
 }
 
+/* 模式启停胶囊开关：圆点在左=停止，滑到右侧点亮=启动 */
+.mode-toggle {
+  position: relative;
+  width: 56px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass-gradient);
+  box-shadow: var(--glass-highlight), 0 2px 8px rgba(103, 80, 164, 0.1);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.mode-toggle:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.mode-toggle:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
+.mode-toggle .knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--ink-3);
+  transition: transform 0.25s cubic-bezier(0.2, 0, 0, 1), background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.mode-toggle.on {
+  background: color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 24%, rgba(255, 255, 255, 0.72));
+  border-color: color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 45%, transparent);
+}
+
+.mode-toggle.on .knob {
+  transform: translateX(28px);
+  background: var(--mode-color, var(--md-sys-color-primary));
+  box-shadow: 0 0 10px color-mix(in srgb, var(--mode-color, var(--md-sys-color-primary)) 65%, transparent);
+}
+
+/* 状态行芯片固定宽度居中：字数不同（不适用/规则缺失/无残留…）时上下居中对齐 */
+.mode-chips .status-chip,
+.mode-chips .rules-chip {
+  justify-content: center;
+}
+.mode-chips .status-chip {
+  min-width: 74px;
+}
+.mode-chips .rules-chip {
+  min-width: 84px;
+}
+
 /* ═══════════════ 10. 表单 ═══════════════ */
 .field {
   display: block;
@@ -872,22 +888,6 @@ md-outlined-text-field {
 .section-title svg {
   color: var(--md-sys-color-primary);
   flex-shrink: 0;
-}
-
-.section-hint {
-  font: 500 12px/16px var(--md-ref-typeface-brand);
-  letter-spacing: 0.4px;
-  color: var(--ink-2);
-  margin: 0 0 10px;
-}
-
-.hint {
-  display: block;
-  font: 400 12px/16px var(--md-ref-typeface-brand);
-  letter-spacing: 0.4px;
-  color: var(--ink-2);
-  margin-top: 6px;
-  line-height: 1.6;
 }
 
 /* 单选卡片（选中 = 1px 边 + 1px inset ring，无回流） */
@@ -1217,52 +1217,11 @@ md-outlined-segmented-button {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* 状态页抬升到 FAB 上方（全局 snackbar 仅状态页触发：
-   设置页提示显示在保存栏内部，配置页提示显示在编辑器面板内） */
-.view-status .snackbar {
-  bottom: 104px;
-}
-
 .snackbar svg {
   flex-shrink: 0;
 }
 
-/* ═══════════════ 15. FAB（56×56 · 圆角16px）────────────────── */
-.fab {
-  position: fixed;
-  right: 32px;
-  bottom: 32px;
-  z-index: 1000;
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  background: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  border: none;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(103, 80, 164, 0.3), 0 12px 28px rgba(103, 80, 164, 0.2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.fab:hover {
-  box-shadow: 0 6px 16px rgba(103, 80, 164, 0.35), 0 16px 36px rgba(103, 80, 164, 0.25);
-}
-
-.fab:focus-visible {
-  outline: 2px solid var(--md-sys-color-primary);
-  outline-offset: 2px;
-}
-
-/* v-ripple 会为 FAB 添加 .ripple-host，其 position: relative 会覆盖
-   .fab 的 fixed——用更高特异性钉回 fixed */
-.fab.ripple-host {
-  position: fixed;
-}
-
-/* ═══════════════ 16. Ripple 涟漪动效 ─────────────────────────── */
+/* ═══════════════ 15. Ripple 涟漪动效 ─────────────────────────── */
 .ripple-host {
   position: relative;
   overflow: hidden;
@@ -1299,16 +1258,7 @@ md-outlined-segmented-button {
   animation: md-ripple 0.55s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
-.btn-filled {
-  --rc: #ffffff;
-}
-.btn-tonal,
-.btn-outlined,
-.glass-card {
-  --rc: #6750a4;
-}
-
-/* ═══════════════ 17. 模式主题色 ═══════════════ */
+/* ═══════════════ 16. 模式主题色 ═══════════════ */
 .c-tun {
   --mode-color: #4f378b;
 }
@@ -1323,6 +1273,12 @@ md-outlined-segmented-button {
 }
 .c-server {
   --mode-color: #006874;
+}
+.c-ep {
+  --mode-color: #00538c;
+}
+.c-ebpf {
+  --mode-color: #8e3b7d;
 }
 
 /* ═══════════════ 18. 底部导航 / 移动端 ═══════════ */
@@ -1363,9 +1319,6 @@ md-outlined-segmented-button {
     margin-top: 16px;
   }
 
-  .stats {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .radio-row {
     flex-direction: column;
   }
@@ -1388,10 +1341,6 @@ md-outlined-segmented-button {
   .mode-actions {
     order: 4;
     flex-basis: 100%;
-  }
-  .mode-actions md-filled-button,
-  .mode-actions md-outlined-button {
-    flex: 1;
   }
 
   /* 配置页：导航列表转横向滚动 */
@@ -1426,19 +1375,11 @@ md-outlined-segmented-button {
     padding-bottom: env(safe-area-inset-bottom);
   }
 
-  .fab {
-    right: 20px;
-    bottom: calc(92px + env(safe-area-inset-bottom));
-  }
-
   .snackbar {
     left: 16px;
     right: 16px;
     bottom: calc(92px + env(safe-area-inset-bottom));
     max-width: none;
-  }
-  .view-status .snackbar {
-    bottom: calc(160px + env(safe-area-inset-bottom));
   }
 
   .save-bar {

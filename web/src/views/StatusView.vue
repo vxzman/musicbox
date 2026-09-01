@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import '@material/web/button/filled-button.js'
-import '@material/web/button/outlined-button.js'
 import Icon from '../components/Icon.vue'
 import type { Status, ModeStatus } from '../api'
 
@@ -12,7 +10,7 @@ const props = defineProps<{
 
 defineEmits<{ (e: 'action', mode: string, action: 'start' | 'stop'): void }>()
 
-const modeOrder = ['tun', 'tproxy', 'redir-tproxy', 'socks', 'server']
+const modeOrder = ['tun', 'tproxy', 'redir-tproxy', 'socks', 'server', 'ep', 'ebpf']
 
 const modeIcons: Record<string, string> = {
   tun: 'activity',
@@ -20,6 +18,8 @@ const modeIcons: Record<string, string> = {
   'redir-tproxy': 'git-merge',
   socks: 'zap',
   server: 'server',
+  ep: 'layers',
+  ebpf: 'cpu',
 }
 
 const entries = computed(() => {
@@ -33,16 +33,6 @@ const entries = computed(() => {
 const activeEntry = computed(() => {
   if (!props.status?.active_mode) return null
   return props.status.modes[props.status.active_mode] ?? null
-})
-
-const stats = computed(() => {
-  const es = entries.value
-  return {
-    total: es.length,
-    running: es.filter((m) => m.active).length,
-    rulesOk: es.filter((m) => rulesClass(m) === 'active').length,
-    failed: es.filter((m) => m.unit_state === 'failed').length,
-  }
 })
 
 const rulesText: Record<string, string> = {
@@ -79,10 +69,6 @@ function unitClass(s: string): string {
   <div>
     <div class="page-head">
       <h1><Icon name="activity" :size="26" /> 运行状态</h1>
-      <p class="sub">
-        切换模式后由守护进程自动编排：先停其他互斥模式，启动 sing-box 实例后延迟套用透明代理规则，
-        规则与实例同生共死；tun 模式仅在 tun 接口消失后做残留清理。
-      </p>
     </div>
 
     <!-- 摘要 Hero：模式色氛围渗入 -->
@@ -107,29 +93,6 @@ function unitClass(s: string): string {
           }}
         </div>
       </div>
-      <span class="chip" :class="!status ? 'chip--warn' : activeEntry ? 'chip--ok' : 'chip--tonal'">
-        <span class="dot"></span>{{ !status ? '连接中' : activeEntry ? '运行中' : '待机' }}
-      </span>
-    </div>
-
-    <!-- 统计条 -->
-    <div v-if="status" class="stats">
-      <div class="stat-tile" :style="{ animationDelay: '0s' }">
-        <span class="stat-label"><span class="stat-ic"><Icon name="grid" :size="14" /></span> 模式总数</span>
-        <span class="stat-value">{{ stats.total }}</span>
-      </div>
-      <div class="stat-tile" :class="{ ok: stats.running > 0 }" :style="{ animationDelay: '0.05s' }">
-        <span class="stat-label"><span class="stat-ic"><Icon name="activity" :size="14" /></span> 运行中</span>
-        <span class="stat-value">{{ stats.running }}</span>
-      </div>
-      <div class="stat-tile" :class="{ ok: stats.rulesOk > 0 }" :style="{ animationDelay: '0.1s' }">
-        <span class="stat-label"><span class="stat-ic"><Icon name="check-circle" :size="14" /></span> 规则就位</span>
-        <span class="stat-value">{{ stats.rulesOk }}</span>
-      </div>
-      <div class="stat-tile" :class="{ err: stats.failed > 0 }" :style="{ animationDelay: '0.15s' }">
-        <span class="stat-label"><span class="stat-ic"><Icon name="alert-triangle" :size="14" /></span> 失败</span>
-        <span class="stat-value">{{ stats.failed }}</span>
-      </div>
     </div>
 
     <!-- 行式模式列表 -->
@@ -153,46 +116,35 @@ function unitClass(s: string): string {
         </div>
 
         <div class="mode-chips">
+          <!-- 已停止不显示状态芯片：开关位置本身已表达启停状态 -->
           <span
-            class="chip chip--small"
+            v-if="m.unit_state !== 'inactive'"
+            class="chip chip--small status-chip"
             :class="{ 'chip--ok': unitClass(m.unit_state) === 'active', 'chip--err': unitClass(m.unit_state) === 'failed' }"
           >
             <span class="dot"></span>
             {{ unitText[m.unit_state] ?? m.unit_state }}
           </span>
-          <span class="chip chip--small" :class="{ 'chip--ok': rulesClass(m) === 'active', 'chip--warn': rulesClass(m) === 'partial' }">
+          <span class="chip chip--small rules-chip" :class="{ 'chip--ok': rulesClass(m) === 'active', 'chip--warn': rulesClass(m) === 'partial' }">
             {{ rulesText[m.rules] ?? m.rules }}
           </span>
         </div>
 
         <div class="mode-actions">
-          <md-filled-button :disabled="loading || m.active" @click="$emit('action', m.name, 'start')">
-            <Icon slot="icon" name="power" :size="16" />
-            启动
-          </md-filled-button>
-          <md-outlined-button
-            class="danger-btn"
-            :disabled="loading || !m.active"
-            @click="$emit('action', m.name, 'stop')"
+          <!-- 胶囊开关：圆点在左=停止，滑到右侧点亮=启动 -->
+          <button
+            type="button"
+            class="mode-toggle"
+            :class="{ on: m.active }"
+            :disabled="loading"
+            :aria-label="m.active ? `停止 ${m.label}` : `启动 ${m.label}`"
+            :title="m.active ? `停止 ${m.label}` : `启动 ${m.label}`"
+            @click="$emit('action', m.name, m.active ? 'stop' : 'start')"
           >
-            <Icon slot="icon" name="stop" :size="16" />
-            停止
-          </md-outlined-button>
+            <span class="knob"></span>
+          </button>
         </div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.danger-btn {
-  --md-outlined-button-outline-color: var(--md-sys-color-error);
-  --md-outlined-button-label-text-color: var(--md-sys-color-error);
-  --md-outlined-button-hover-label-text-color: var(--md-sys-color-error);
-  --md-outlined-button-focus-label-text-color: var(--md-sys-color-error);
-  --md-outlined-button-pressed-label-text-color: var(--md-sys-color-error);
-  --md-outlined-button-hover-state-layer-color: var(--md-sys-color-error);
-  --md-outlined-button-focus-state-layer-color: var(--md-sys-color-error);
-  --md-outlined-button-pressed-state-layer-color: var(--md-sys-color-error);
-}
-</style>

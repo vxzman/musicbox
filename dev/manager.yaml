@@ -105,3 +105,11 @@ modes:
     label: SERVER
     unit: singbox@server
     config: config_server.json
+  ep:
+    label: EP
+    unit: singbox@ep
+    config: config_ep.json
+  ebpf:
+    label: EBPF
+    unit: singbox@ebpf
+    config: config_ebpf.json

@@ -67,9 +67,9 @@ func (m *Manager) StartMode(ctx context.Context, mode string) error {
 		return fmt.Errorf("未知模式: %s", mode)
 	}
 
-	// 用户自管模式（无 preset，如 server）：配置文件必须由用户预先放置，
-	// 管理器不生成、不校验，只负责启停。
-	if md.Preset == "" {
+	// 用户自管模式（无 preset 且无 endpoints，如 server）：配置文件必须由
+	// 用户预先放置，管理器不生成、不校验，只负责启停。
+	if md.SelfManaged() {
 		path := filepath.Join(m.cfg.ConfigDir(), md.Config)
 		if _, err := os.Stat(path); err != nil {
 			return fmt.Errorf("模式 %s 的配置文件 %s 不存在（该模式配置由用户自管，请自行放置后重试）", mode, path)

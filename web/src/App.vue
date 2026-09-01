@@ -98,54 +98,68 @@ const appChipText = computed(() => (!status.value ? '连接中…' : activeLabel
       <div class="noise"></div>
     </div>
 
-    <!-- 浮动胶囊导航（Level 2 Nav） -->
-    <header class="nav-wrap">
-      <nav class="nav-inner" aria-label="主导航">
-        <span class="logo">
-          <span class="logo-mark"><Icon name="cube" :size="18" /></span>
-          <span class="logo-text">Singbox Manager</span>
-        </span>
+    <!-- 缩放外壳：导航 + 主内容整体缩小并居中（zoom 实现，四周留白；
+         fixed 浮层 FAB/snackbar/底部导航保持在外壳之外） -->
+    <div class="app-scale">
+      <header class="nav-wrap">
+        <nav class="nav-inner" aria-label="主导航">
+          <span class="logo">
+            <!-- sing-box 立体开口六边形盒子（与标签页 favicon 同款，代码重绘） -->
+            <span class="logo-mark">
+              <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true">
+                <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="none" stroke="#6750a4" stroke-width="4" />
+                <polygon points="50,15 85,32 85,68 50,85 15,68 15,32" fill="#f6f1ff" />
+                <polygon points="50,15 85,32 50,45 15,32" fill="#efe8fc" />
+                <polygon points="15,32 50,45 50,85 15,68" fill="#b69ce6" />
+                <polygon points="85,32 50,45 50,85 85,68" fill="#8a6fd0" />
+                <polygon points="85,32 85,68 75,73 75,37" fill="#d9c8f8" opacity="0.5" />
+                <polygon points="50,45 75,37 50,55 25,45" fill="#3d2e5c" opacity="0.8" />
+              </svg>
+            </span>
+            <span class="logo-text">Singbox Manager</span>
+          </span>
 
-        <div class="nav-links">
-          <button
-            v-for="item in nav"
-            :key="item.key"
-            type="button"
-            class="nav-item"
-            :class="{ active: view === item.key }"
-            :aria-current="view === item.key ? 'page' : undefined"
-            @click="view = item.key"
-            v-ripple
-          >
-            <Icon :name="item.icon" :size="16" />
-            <span>{{ item.label }}</span>
-          </button>
-        </div>
+          <div class="nav-links">
+            <button
+              v-for="item in nav"
+              :key="item.key"
+              type="button"
+              class="nav-item"
+              :class="{ active: view === item.key }"
+              :aria-current="view === item.key ? 'page' : undefined"
+              @click="view = item.key"
+              v-ripple
+            >
+              <Icon :name="item.icon" :size="16" />
+              <span>{{ item.label }}</span>
+            </button>
+          </div>
 
-        <div class="nav-actions">
-          <span class="chip" :class="appChipClass"><span class="dot"></span>{{ appChipText }}</span>
-          <md-icon-button aria-label="刷新状态" title="刷新状态" @click="refresh">
-            <Icon name="refresh-cw" :size="18" />
-          </md-icon-button>
-        </div>
+          <div class="nav-actions">
+            <span class="chip" :class="appChipClass"><span class="dot"></span>{{ appChipText }}</span>
+            <md-icon-button aria-label="刷新状态" title="刷新状态" @click="refresh">
+              <Icon name="refresh-cw" :size="18" />
+            </md-icon-button>
+          </div>
 
-        <md-linear-progress v-if="loading" indeterminate class="app-bar-progress"></md-linear-progress>
-      </nav>
-    </header>
+          <md-linear-progress v-if="loading" indeterminate class="app-bar-progress"></md-linear-progress>
+        </nav>
+      </header>
 
-    <main class="main">
-      <Transition name="view" mode="out-in">
-        <StatusView
-          v-if="view === 'status'"
-          key="status"
-          :status="status"
-          :loading="loading"
-          @action="onModeAction"
-        />
-        <ConfigView v-else-if="view === 'config'" key="config" />
-        <SettingsView v-else key="settings" />
-      </Transition>
-    </main>
+      <main class="main">
+        <Transition name="view" mode="out-in">
+          <StatusView
+            v-if="view === 'status'"
+            key="status"
+            :status="status"
+            :loading="loading"
+            @action="onModeAction"
+          />
+          <ConfigView v-else-if="view === 'config'" key="config" />
+          <SettingsView v-else key="settings" />
+        </Transition>
+      </main>
+    </div>
 
     <!-- 移动端：MD3 底部导航 -->
     <nav class="bottom-nav">
@@ -156,18 +170,6 @@ const appChipText = computed(() => (!status.value ? '连接中…' : activeLabel
         </md-navigation-tab>
       </md-navigation-bar>
     </nav>
-
-    <!-- FAB：刷新状态（仅状态页显示，避免与配置/设置页底部浮层冲突） -->
-    <button
-      v-if="view === 'status'"
-      v-ripple
-      class="fab btn-filled"
-      aria-label="刷新状态"
-      title="刷新状态"
-      @click="refresh"
-    >
-      <Icon name="refresh-cw" :size="22" />
-    </button>
 
     <!-- Snackbar：玻璃逆表面 -->
     <transition name="fade">

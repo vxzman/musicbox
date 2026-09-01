@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Sing-box 立体开口六边形盒子（浅色浏览器主题）：
+       几何参照 clash/mihomo logo 参考文件，配色采用 MD3 seed #6750A4 -->
+  <rect x="2" y="2" width="96" height="96" rx="24" fill="#eaddff"/>
+  <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="none" stroke="#6750a4" stroke-width="3"/>
+  <polygon points="50,15 85,32 85,68 50,85 15,68 15,32" fill="#f6f1ff"/>
+  <!-- 顶面 -->
+  <polygon points="50,15 85,32 50,45 15,32" fill="#efe8fc"/>
+  <!-- 左侧面 -->
+  <polygon points="15,32 50,45 50,85 15,68" fill="#b69ce6"/>
+  <!-- 右侧面 -->
+  <polygon points="85,32 50,45 50,85 85,68" fill="#8a6fd0"/>
+  <!-- 高光 -->
+  <polygon points="85,32 85,68 75,73 75,37" fill="#d9c8f8" opacity="0.5"/>
+  <!-- 开口暗面 -->
+  <polygon points="50,45 75,37 50,55 25,45" fill="#3d2e5c" opacity="0.8"/>
+</svg>

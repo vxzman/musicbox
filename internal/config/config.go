@@ -107,6 +107,13 @@ func fillDefaults(cfg *ManagerConfig) {
 			m.Config = "config_" + name + ".json"
 		}
 	}
+	// 升级补齐：老版本 manager.yaml 没有的内置模式（如 ep/ebpf）自动补入，
+	// 否则升级后新模式的标签页/状态行不会出现。
+	for name, dm := range def.Modes {
+		if _, ok := cfg.Modes[name]; !ok {
+			cfg.Modes[name] = dm
+		}
+	}
 }
 
 // Validate 检查结构完整性；tproxy/redir-tproxy 的回环避免必须 gid/mark 至少其一。
@@ -144,6 +151,11 @@ func Validate(cfg *ManagerConfig) error {
 		if m.Preset != "" {
 			if err := ValidatePreset(m.Preset); err != nil {
 				return fmt.Errorf("模式 %s 预定义配置无效: %w", name, err)
+			}
+		}
+		if m.Endpoints != "" {
+			if err := ValidateEndpoints(m.Endpoints); err != nil {
+				return fmt.Errorf("模式 %s 端点模块无效: %w", name, err)
 			}
 		}
 	}

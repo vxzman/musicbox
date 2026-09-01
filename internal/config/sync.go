@@ -61,6 +61,22 @@ func SaveGeneral(c *ManagerConfig, content string) error {
 	return SyncAll(c, content)
 }
 
+// SaveModeConfig 保存用户自管模式（server 等）的配置文件：sing-box check
+// 校验后直接写入。不触发 SyncAll——自管模式配置不会被生成流程覆盖。
+func SaveModeConfig(c *ManagerConfig, mode, content string) error {
+	if err := testSingBoxConfig(c, content); err != nil {
+		return fmt.Errorf("sing-box 配置测试失败: %w", err)
+	}
+	path, err := c.ModeConfigPath(mode)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		return fmt.Errorf("写入配置 %s 失败: %w", mode, err)
+	}
+	return nil
+}
+
 // SyncAll 读取当前通用配置（content 为空则读盘），生成全部模式配置。
 func SyncAll(c *ManagerConfig, content string) error {
 	if content == "" {
@@ -75,10 +91,10 @@ func SyncAll(c *ManagerConfig, content string) error {
 		return err
 	}
 	for name := range c.Modes {
-		if c.Modes[name].Preset == "" {
-			continue // 用户自管模式（server）：不生成、不覆盖
+		if c.Modes[name].SelfManaged() {
+			continue // 用户自管模式（server 等）：不生成、不覆盖
 		}
-		cfg, err := buildModeConfig(general, c.Modes[name].Preset)
+		cfg, err := buildModeConfig(general, c.Modes[name].Preset, c.Modes[name].Endpoints)
 		if err != nil {
 			return fmt.Errorf("生成 %s 配置失败: %w", name, err)
 		}
@@ -126,44 +142,77 @@ func ValidatePreset(preset string) error {
 	return nil
 }
 
-// buildModeConfig 将通用配置与模式 preset 合并：用户自写 inbounds 保留，
-// preset 中同 tag 覆盖、缺 tag 追加。
-func buildModeConfig(general map[string]interface{}, preset string) ([]byte, error) {
-	var presetInbounds []map[string]interface{}
-	if err := json.Unmarshal([]byte(preset), &presetInbounds); err != nil {
-		return nil, fmt.Errorf("解析预定义配置失败: %w", err)
+// ValidateEndpoints 检查端点模块是否为非空 JSON 数组，且每项都有 type 与 tag。
+func ValidateEndpoints(endpoints string) error {
+	var eps []map[string]interface{}
+	if err := json.Unmarshal([]byte(endpoints), &eps); err != nil {
+		return fmt.Errorf("JSON 语法错误: %w", err)
 	}
+	if len(eps) == 0 {
+		return fmt.Errorf("端点模块必须是至少包含一项的数组")
+	}
+	for i, ep := range eps {
+		if t, _ := ep["type"].(string); t == "" {
+			return fmt.Errorf("端点模块第 %d 项缺少 type", i+1)
+		}
+		if tag, _ := ep["tag"].(string); tag == "" {
+			return fmt.Errorf("端点模块第 %d 项缺少 tag", i+1)
+		}
+	}
+	return nil
+}
 
+// mergeByTag 将 preset 数组按 tag 合并进 cfg[key] 数组：同 tag 覆盖、缺 tag 追加。
+func mergeByTag(cfg map[string]interface{}, key string, preset []map[string]interface{}) {
+	merged := []interface{}{}
+	byTag := map[string]int{}
+	if existing, ok := cfg[key].([]interface{}); ok {
+		for _, item := range existing {
+			if m, ok := item.(map[string]interface{}); ok {
+				if tag, ok := m["tag"].(string); ok && tag != "" {
+					byTag[tag] = len(merged)
+				}
+			}
+			merged = append(merged, item)
+		}
+	}
+	for _, item := range preset {
+		tag, _ := item["tag"].(string)
+		if tag != "" {
+			if idx, exists := byTag[tag]; exists {
+				merged[idx] = item // 覆盖
+				continue
+			}
+			byTag[tag] = len(merged)
+		}
+		merged = append(merged, item)
+	}
+	cfg[key] = merged
+}
+
+// buildModeConfig 将通用配置与模式 preset / endpoints 合并：用户自写模块保留，
+// 同 tag 覆盖、缺 tag 追加。endpoints 为空（入站类模式）时不触碰顶层 endpoints。
+func buildModeConfig(general map[string]interface{}, preset, endpoints string) ([]byte, error) {
 	cfg := make(map[string]interface{}, len(general)+1)
 	for k, v := range general {
 		cfg[k] = v
 	}
 
-	// 合并 inbounds：preset 的同 tag 项覆盖通用配置里的同名项
-	merged := []interface{}{}
-	byTag := map[string]int{}
-	if existing, ok := cfg["inbounds"].([]interface{}); ok {
-		for _, in := range existing {
-			if m, ok := in.(map[string]interface{}); ok {
-				if tag, ok := m["tag"].(string); ok && tag != "" {
-					byTag[tag] = len(merged)
-				}
-			}
-			merged = append(merged, in)
+	if preset != "" {
+		var presetInbounds []map[string]interface{}
+		if err := json.Unmarshal([]byte(preset), &presetInbounds); err != nil {
+			return nil, fmt.Errorf("解析预定义配置失败: %w", err)
 		}
+		mergeByTag(cfg, "inbounds", presetInbounds)
 	}
-	for _, in := range presetInbounds {
-		tag, _ := in["tag"].(string)
-		if tag != "" {
-			if idx, exists := byTag[tag]; exists {
-				merged[idx] = in // 覆盖
-				continue
-			}
-			byTag[tag] = len(merged)
+
+	if endpoints != "" {
+		var eps []map[string]interface{}
+		if err := json.Unmarshal([]byte(endpoints), &eps); err != nil {
+			return nil, fmt.Errorf("解析端点模块失败: %w", err)
 		}
-		merged = append(merged, in)
+		mergeByTag(cfg, "endpoints", eps)
 	}
-	cfg["inbounds"] = merged
 
 	// JSON 不支持注释，仅做美化输出
 	return json.MarshalIndent(cfg, "", "  ")

@@ -31,6 +31,7 @@ export interface ModeSettings {
   cleanup?: { nft_tables?: string[] }
   env?: EnvSettings | null
   preset?: string
+  endpoints?: string
 }
 
 export interface ManagerSettings {
@@ -72,6 +73,15 @@ export async function saveGeneral(content: string) {
 export async function fetchModeConfig(mode: string): Promise<string> {
   const r = await req<{ content: string }>(`/api/config/mode/${encodeURIComponent(mode)}`)
   return r.content
+}
+
+// 保存用户自管模式（server 等）的配置文件。
+export async function saveModeConfig(mode: string, content: string) {
+  await req(`/api/config/mode/${encodeURIComponent(mode)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
 }
 
 export const fetchSettings = () => req<ManagerSettings>('/api/settings')

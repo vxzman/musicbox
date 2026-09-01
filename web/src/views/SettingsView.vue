@@ -16,12 +16,20 @@ const saving = ref(false)
 const bypassTproxy = ref<'gid' | 'mark'>('gid')
 const bypassRedir = ref<'gid' | 'mark'>('gid')
 
+// EP 端点模块 / EBPF 入站模块 / SOCKS 入站端口（模块 JSON 复杂，
+// 用字段编辑：ep/ebpf 编辑模块本身，socks 只编辑端口）
+const epEndpoints = ref('')
+const ebpfPreset = ref('')
+const socksPort = ref(20080)
+
 const tabs = [
   { key: 'daemon', label: '守护进程' },
   { key: 'tun', label: 'TUN' },
   { key: 'tproxy', label: 'TPROXY' },
   { key: 'redir', label: 'REDIR' },
   { key: 'socks', label: 'SOCKS' },
+  { key: 'ep', label: 'EP' },
+  { key: 'ebpf', label: 'EBPF' },
   { key: 'server', label: 'SERVER' },
 ]
 const tab = ref('daemon')
@@ -41,11 +49,45 @@ function onNum(e: Event, set: (v: number) => void) {
   set(v === '' ? 0 : Number(v))
 }
 
+// 从 socks preset 里取出 mixed 入站端口（解析失败回退默认 20080）。
+function readSocksPort(preset?: string): number {
+  try {
+    const arr = JSON.parse(preset ?? '')
+    if (Array.isArray(arr) && arr[0] && typeof arr[0] === 'object' && arr[0].listen_port) {
+      return Number(arr[0].listen_port)
+    }
+  } catch {
+    /* 解析失败回退默认端口 */
+  }
+  return 20080
+}
+
+// 把端口写回 socks preset（preset 缺失/非法时按默认 mixed 结构生成）。
+function buildSocksPreset(port: number, preset?: string): string {
+  try {
+    const arr = JSON.parse(preset ?? '')
+    if (Array.isArray(arr) && arr[0] && typeof arr[0] === 'object') {
+      arr[0].listen_port = port
+      return JSON.stringify(arr, null, 2)
+    }
+  } catch {
+    /* 重建默认 preset */
+  }
+  return JSON.stringify(
+    [{ type: 'mixed', tag: 'mixed-in', listen: '0.0.0.0', listen_port: port, tcp_fast_open: true }],
+    null,
+    2,
+  )
+}
+
 onMounted(async () => {
   try {
     settings.value = await fetchSettings()
     if ((settings.value.modes.tproxy?.env?.exclude_gid ?? 0) <= 0) bypassTproxy.value = 'mark'
     if ((settings.value.modes['redir-tproxy']?.env?.exclude_gid ?? 0) <= 0) bypassRedir.value = 'mark'
+    epEndpoints.value = settings.value.modes.ep?.endpoints ?? ''
+    ebpfPreset.value = settings.value.modes.ebpf?.preset ?? ''
+    socksPort.value = readSocksPort(settings.value.modes.socks?.preset)
   } catch (e) {
     message.value = { ok: false, text: (e as Error).message }
   }
@@ -76,9 +118,9 @@ async function save() {
       modes[name] = { env, preset: s.modes[name]?.preset ?? '' }
     }
 
-    for (const name of ['socks']) {
-      if (s.modes[name]) modes[name] = { preset: s.modes[name]!.preset ?? '' }
-    }
+    if (s.modes.socks) modes.socks = { preset: buildSocksPreset(socksPort.value, s.modes.socks.preset) }
+    if (s.modes.ep) modes.ep = { endpoints: epEndpoints.value }
+    if (s.modes.ebpf) modes.ebpf = { preset: ebpfPreset.value }
 
     await saveSettings(update)
     message.value = { ok: true, text: '设置已保存' }
@@ -94,10 +136,6 @@ async function save() {
   <div v-if="settings">
     <div class="page-head">
       <h1><Icon name="sliders" :size="26" /> 系统设置</h1>
-      <p class="sub">
-        以下字段写入 /opt/singbox-manager/manager.yaml——规则数字、环境变量与预定义入站的唯一事实源，
-        由守护进程与各模式编排共同读取。
-      </p>
     </div>
 
     <!-- 分段选项卡（玻璃胶囊） -->
@@ -123,7 +161,6 @@ async function save() {
             :value="settings.daemon.web_addr"
             @input="onInput($event, (v) => (settings.daemon.web_addr = v))"
           ></md-outlined-text-field>
-          <small class="hint">面板无鉴权：默认仅监听 IPv4。需 IPv6 时设为 [::]:8082（仅 IPv6）或 :8082（双栈）</small>
         </div>
         <div class="field">
           <md-outlined-text-field
@@ -145,7 +182,7 @@ async function save() {
 
     <!-- TUN -->
     <div v-show="tab === 'tun'" class="card">
-      <div class="section-title"><Icon name="activity" :size="15" /> TUN 路由索引（tun0 消失后按此清理）</div>
+      <div class="section-title"><Icon name="activity" :size="15" /> TUN 路由索引</div>
       <div class="row">
         <div class="field">
           <md-outlined-text-field
@@ -211,7 +248,6 @@ async function save() {
         </div>
       </div>
 
-      <p class="section-hint">回环避免方式（二选一，gid 优先）</p>
       <div class="radio-row">
         <label class="radio-card" :class="{ selected: bypassTproxy === 'gid' }" @click="bypassTproxy = 'gid'" v-ripple>
           <md-radio name="bypass-tproxy" :checked="bypassTproxy === 'gid'"></md-radio>
@@ -250,7 +286,7 @@ async function save() {
 
     <!-- REDIR-TPROXY -->
     <div v-show="tab === 'redir'" class="card">
-      <div class="section-title"><Icon name="git-merge" :size="15" /> REDIR-TPROXY 网络参数（TCP REDIRECT + UDP TPROXY）</div>
+      <div class="section-title"><Icon name="git-merge" :size="15" /> REDIR-TPROXY 网络参数</div>
       <div class="row">
         <div class="field">
           <md-outlined-text-field
@@ -293,7 +329,6 @@ async function save() {
         </div>
       </div>
 
-      <p class="section-hint">回环避免方式（二选一，gid 优先）</p>
       <div class="radio-row">
         <label class="radio-card" :class="{ selected: bypassRedir === 'gid' }" @click="bypassRedir = 'gid'" v-ripple>
           <md-radio name="bypass-redir" :checked="bypassRedir === 'gid'"></md-radio>
@@ -332,27 +367,51 @@ async function save() {
 
     <!-- SOCKS -->
     <div v-show="tab === 'socks'" class="card">
-      <div class="section-title"><Icon name="zap" :size="15" /> SOCKS 预定义入站</div>
-      <p class="section-hint">默认 mixed 20080</p>
+      <div class="section-title"><Icon name="zap" :size="15" /> SOCKS 入站端口</div>
+      <div class="row">
+        <div class="field">
+          <md-outlined-text-field
+            label="入站端口"
+            type="number"
+            :value="socksPort"
+            @input="onNum($event, (v) => (socksPort = v))"
+          ></md-outlined-text-field>
+        </div>
+      </div>
+    </div>
+
+    <!-- EP（endpoint 模式） -->
+    <div v-show="tab === 'ep'" class="card">
+      <div class="section-title"><Icon name="layers" :size="15" /> EP 端点模块（endpoints）</div>
       <md-outlined-text-field
-        label="预定义入站 preset（JSON）"
+        label="端点模块 endpoints（JSON 数组）"
         type="textarea"
         rows="10"
         class="code"
-        :value="settings.modes.socks!.preset"
-        @input="onInput($event, (v) => (settings.modes.socks!.preset = v))"
+        placeholder='[ { "type": "wireguard", "tag": "wg-ep", "system_interface": false, "interface_name": "wg0", "private_key": "...", "address": ["10.0.0.2/32"], "peers": [ { "server": "...", "server_port": 51820, "public_key": "...", "allowed_ips": ["0.0.0.0/0"] } ] } ]'
+        :value="epEndpoints"
+        @input="onInput($event, (v) => (epEndpoints = v))"
+      ></md-outlined-text-field>
+    </div>
+
+    <!-- EBPF（ebpf 入站） -->
+    <div v-show="tab === 'ebpf'" class="card">
+      <div class="section-title"><Icon name="cpu" :size="15" /> EBPF 入站模块</div>
+      <md-outlined-text-field
+        label="预定义入站 preset（JSON 数组）"
+        type="textarea"
+        rows="10"
+        class="code"
+        placeholder='[ { "type": "ebpf", "tag": "ebpf-in" } ]'
+        :value="ebpfPreset"
+        @input="onInput($event, (v) => (ebpfPreset = v))"
       ></md-outlined-text-field>
     </div>
 
     <!-- SERVER -->
     <div v-show="tab === 'server'" class="card">
       <div class="section-title"><Icon name="server" :size="15" /> SERVER 模式（用户自管）</div>
-      <p class="sub">
-        该模式的配置文件 <b style="font-family: var(--font-mono)">config_server.json</b> 由用户自行管理：
-        管理器不生成、不覆盖、不校验其内容，只负责启动/停止与状态监控。
-        请自行将配置文件放入 <b style="font-family: var(--font-mono)">/etc/singbox/config_server.json</b>，
-        之后即可在状态页正常启停该模式。
-      </p>
+      <p class="sub">在「配置管理」页直接编辑保存 config_server.json。</p>
     </div>
 
     <!-- 保存栏（玻璃浮层） -->

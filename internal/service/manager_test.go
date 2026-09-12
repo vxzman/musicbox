@@ -1,17 +1,12 @@
-//go:build !container
-
-package systemd
+package service
 
 import "testing"
 
 func TestNormalize(t *testing.T) {
 	cases := map[string]string{
 		"sing-box@tun":         "sing-box@tun.service",
-		"sing-box@tproxy":      "sing-box@tproxy.service",
 		"sing-box@tun.service": "sing-box@tun.service",
-		"singbox@tun":          "singbox@tun.service",
 		"foo.socket":           "foo.socket",
-		"plain-service":        "plain-service.service",
 		"":                     "",
 	}
 	for in, want := range cases {

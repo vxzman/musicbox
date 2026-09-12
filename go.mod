@@ -1,4 +1,4 @@
-module singbox-manager
+module musicbox
 
 go 1.22
 

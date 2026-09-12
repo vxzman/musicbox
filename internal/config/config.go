@@ -10,17 +10,21 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Path 返回 manager.yaml 的位置：SINGBOX_MANAGER_CONFIG 优先（dev/测试用），
-// 默认 /opt/singbox-manager/manager.yaml。
+// Path 返回 manager.yaml 的位置：MUSICBOX_CONFIG 优先（dev/测试用），
+// 也兼容旧环境变量 SINGBOX_MANAGER_CONFIG，
+// 默认 /opt/musicbox/manager.yaml。
 func Path() string {
+	if v := os.Getenv("MUSICBOX_CONFIG"); v != "" {
+		return v
+	}
 	if v := os.Getenv("SINGBOX_MANAGER_CONFIG"); v != "" {
 		return v
 	}
 	return DefaultConfigPath
 }
 
-// Load 读取 manager.yaml；文件不存在时先尝试从老布局迁移（/etc/singbox 下的
-// .conf），迁移不到就用内置默认值，并把结果落盘——保证首启即可用。
+// Load 读取 manager.yaml；文件不存在时先尝试从老布局迁移（/etc/sing-box 下的
+// .conf 或 /opt/singbox-manager/manager.yaml），迁移不到就用内置默认值，并把结果落盘——保证首启即可用。
 func Load() (*ManagerConfig, error) {
 	path := Path()
 	data, err := os.ReadFile(path)
@@ -30,15 +34,37 @@ func Load() (*ManagerConfig, error) {
 			return nil, fmt.Errorf("解析 %s 失败: %w", path, err)
 		}
 		fillDefaults(&cfg)
+		changed := pruneRetiredModes(&cfg)
+		changed = canonicalizeDirs(&cfg) || changed
+		if changed {
+			_ = Save(&cfg)
+		}
 		return &cfg, nil
 	}
 	if !os.IsNotExist(err) {
 		return nil, err
 	}
 
+	// 兼容迁移：如果 /opt/musicbox/manager.yaml 不存在，但 /opt/singbox-manager/manager.yaml 存在，
+	// 则自动读取旧配置并落盘至新路径
+	if path == DefaultConfigPath {
+		if oldData, oldErr := os.ReadFile(LegacyConfigPath); oldErr == nil {
+			var oldCfg ManagerConfig
+			if yaml.Unmarshal(oldData, &oldCfg) == nil {
+				fillDefaults(&oldCfg)
+				pruneRetiredModes(&oldCfg)
+				canonicalizeDirs(&oldCfg)
+				_ = Save(&oldCfg)
+				return &oldCfg, nil
+			}
+		}
+	}
+
 	cfg := Default()
 	applyLegacyMigration(cfg)
 	fillDefaults(cfg)
+	pruneRetiredModes(cfg)
+	canonicalizeDirs(cfg)
 	if err := Save(cfg); err != nil {
 		return nil, fmt.Errorf("生成默认配置 %s 失败: %w", path, err)
 	}
@@ -83,7 +109,7 @@ func fillDefaults(cfg *ManagerConfig) {
 	if cfg.Daemon.WebAddr == ":8082" {
 		cfg.Daemon.WebAddr = def.Daemon.WebAddr
 	}
-	if cfg.Daemon.CliSocket == "" {
+	if cfg.Daemon.CliSocket == "" || cfg.Daemon.CliSocket == "/run/singbox-manager/singbox-manager.sock" {
 		cfg.Daemon.CliSocket = def.Daemon.CliSocket
 	}
 	if cfg.Daemon.ApplyDelayMs == 0 {
@@ -101,19 +127,53 @@ func fillDefaults(cfg *ManagerConfig) {
 			m.Label = name
 		}
 		if m.Unit == "" {
-			m.Unit = "singbox@" + name
+			m.Unit = "sing-box@" + name
 		}
 		if m.Config == "" {
 			m.Config = "config_" + name + ".json"
 		}
 	}
-	// 升级补齐：老版本 manager.yaml 没有的内置模式（如 ep/ebpf）自动补入，
-	// 否则升级后新模式的标签页/状态行不会出现。
+	// 升级补齐：老版本 manager.yaml 缺少的内置模式自动补入。
 	for name, dm := range def.Modes {
 		if _, ok := cfg.Modes[name]; !ok {
 			cfg.Modes[name] = dm
 		}
 	}
+}
+
+func pruneRetiredModes(cfg *ManagerConfig) bool {
+	changed := false
+	for _, name := range retiredModes {
+		if _, ok := cfg.Modes[name]; ok {
+			delete(cfg.Modes, name)
+			changed = true
+		}
+	}
+	return changed
+}
+
+// canonicalizeDirs 把生产环境的配置目录钉在 /etc/sing-box。
+// 相对路径 etc-sing-box 只留给 yaml 旁边确实存在该目录的 dev fixture；
+// 落到 /opt/musicbox/manager.yaml 时若仍写相对路径，会错误读成
+// /opt/musicbox/etc-sing-box。
+func canonicalizeDirs(cfg *ManagerConfig) bool {
+	changed := false
+	switch cfg.Dirs.ConfigDir {
+	case "etc-sing-box", "etc-singbox":
+		local := filepath.Join(filepath.Dir(Path()), cfg.Dirs.ConfigDir)
+		if _, err := os.Stat(local); err != nil {
+			cfg.Dirs.ConfigDir = "/etc/sing-box"
+			changed = true
+		}
+	case "/etc/singbox":
+		cfg.Dirs.ConfigDir = "/etc/sing-box"
+		changed = true
+	}
+	if cfg.Dirs.DataDir == "/var/lib/singbox" {
+		cfg.Dirs.DataDir = "/var/lib/sing-box"
+		changed = true
+	}
+	return changed
 }
 
 // Validate 检查结构完整性；tproxy/redir-tproxy 的回环避免必须 gid/mark 至少其一。

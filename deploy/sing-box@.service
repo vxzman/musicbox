@@ -1,6 +1,5 @@
 [Unit]
-Description=Sing-Box Daemon
-Documentation=https://sing-box.sagernet.org
+Description=Proxy Core Daemon
 After=network.target nss-lookup.target network-online.target
 
 [Service]
@@ -9,7 +8,7 @@ User=sing-box
 Group=sing-box
 CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
 AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
-ExecStart=/usr/local/bin/sing-box run -D /var/lib/singbox -c /etc/singbox/config_%i.json
+ExecStart=/usr/local/bin/sing-box run -D /var/lib/sing-box -c /etc/sing-box/config_%i.json
 ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=10

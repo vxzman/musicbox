@@ -19,8 +19,8 @@
 
 ### 3. 新增 EP / EBPF 两种模式
 
-- **EP**（`singbox@ep` / `config_ep.json`）：在 `config_generic.json` 基础上插入**顶层 `endpoints` 模块数组**（与 `dns`/`inbounds` 平行，按 tag 合并），例如 wireguard 端点。
-- **EBPF**（`singbox@ebpf` / `config_ebpf.json`）：插入 **ebpf 入站模块**（复用 preset → inbounds 合并机制），配置内容由用户填写（仅测试版 sing-box 支持）。
+- **EP**（`sing-box@ep` / `config_ep.json`）：在 `config_generic.json` 基础上插入**顶层 `endpoints` 模块数组**（与 `dns`/`inbounds` 平行，按 tag 合并），例如 wireguard 端点。
+- **EBPF**（`sing-box@ebpf` / `config_ebpf.json`）：插入 **ebpf 入站模块**（复用 preset → inbounds 合并机制），配置内容由用户填写（仅测试版 sing-box 支持）。
 - `Mode` 新增 `Endpoints` 字段 + `SelfManaged()` 判断（preset 与 endpoints 均为空即用户自管）。
 - `fillDefaults` 自动补齐老 `manager.yaml` 缺失的内置模式（升级后面板直接出现 ep/ebpf）。
 - 生成合并逻辑泛化为 `mergeByTag`（inbounds / endpoints 共用）。
@@ -70,7 +70,7 @@
 - `SyncAll` 跳过条件用 `md.SelfManaged()`；`StartMode` 对自管模式先查配置文件存在，报错文案要提示「该模式配置由用户自管」。
 - **sing-box check 会对所有生成配置全量校验**：ebpf 入站在非测试版 sing-box 上会校验失败导致整次同步失败——部署环境必须用支持 ebpf 的测试版；开发机无 sing-box 时自动跳过（`LookPath` 失败即返回 nil）。
 - 设置保存（`Save`）会把 `manager.yaml` 整文件 `yaml.Marshal` 重排为 **4 空格缩进**并丢弃注释——冒烟测试后要还原 fixture，避免 git 大块缩进 churn。
-- 前端产物内嵌于二进制：改前端必须 `npm run build` 后再 `go build`，否则面板还是旧界面；`./singbox-manager info` 可核对「内嵌前端：已构建」。
+- 前端产物内嵌于二进制：改前端必须 `npm run build` 后再 `go build`，否则面板还是旧界面；`./musicbox info` 可核对「内嵌前端：已构建」。
 
 ### 前端
 

@@ -10,7 +10,7 @@ import { configSync, fetchGeneral, fetchModeConfig, fetchSettings, saveGeneral, 
 
 const target = ref('general')
 const modes = ref<string[]>([])
-// 用户自管模式（server 等）：无 preset 且无 endpoints，配置文件可直接编辑保存
+// 用户自管模式：无 preset，配置文件可直接编辑保存
 const selfManaged = ref<Set<string>>(new Set())
 const content = ref('')
 const loading = ref(false)
@@ -35,7 +35,7 @@ onMounted(async () => {
     modes.value = Object.keys(settings.modes)
     selfManaged.value = new Set(
       Object.entries(settings.modes)
-        .filter(([, m]) => !m.preset && !m.endpoints)
+        .filter(([, m]) => !m.preset)
         .map(([name]) => name),
     )
   } catch (e) {
@@ -89,7 +89,7 @@ async function sync() {
 <template>
   <div>
     <div class="page-head">
-      <h1><Icon name="file" :size="26" /> 配置管理</h1>
+      <h1><Icon name="file" :size="22" /> 配置管理</h1>
     </div>
 
     <div class="config-layout">
@@ -144,7 +144,7 @@ async function sync() {
           <md-outlined-text-field
             :value="content"
             type="textarea"
-            rows="26"
+            rows="18"
             class="code"
             :readonly="!editable"
             spellcheck="false"

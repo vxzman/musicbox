@@ -75,7 +75,7 @@ export async function fetchModeConfig(mode: string): Promise<string> {
   return r.content
 }
 
-// 保存用户自管模式（server 等）的配置文件。
+// 保存用户自管模式的配置文件。
 export async function saveModeConfig(mode: string, content: string) {
   await req(`/api/config/mode/${encodeURIComponent(mode)}`, {
     method: 'PUT',

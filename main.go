@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"text/tabwriter"
 
-	"singbox-manager/internal/cli"
-	"singbox-manager/internal/server"
+	"musicbox/internal/cli"
+	"musicbox/internal/server"
 )
 
 // 构建信息：由构建脚本经 -ldflags "-X main.version=... -X main.buildTime=..."
@@ -35,9 +35,9 @@ func main() {
 
 	switch args[0] {
 	case "serve":
-		// 守护进程（systemd 服务入口）
+		// 守护进程（systemd 服务入口；容器构建为进程后端）
 		if err := server.RunDaemon(webFS); err != nil {
-			fmt.Fprintf(os.Stderr, "singbox-manager serve 失败: %v\n", err)
+			fmt.Fprintf(os.Stderr, "musicbox serve 失败: %v\n", err)
 			os.Exit(1)
 		}
 	case "info":
@@ -57,7 +57,7 @@ func main() {
 			os.Exit(1)
 		}
 	default:
-		// 模式操作：singbox-manager <mode> start|stop
+		// 模式操作：musicbox <mode> start|stop
 		if len(args) < 2 {
 			usage()
 			os.Exit(2)
@@ -71,7 +71,7 @@ func main() {
 
 // printInfo 展示构建信息，用于区分二进制是否为最新构建。
 func printInfo() {
-	fmt.Printf("singbox-manager %s\n\n", version)
+	fmt.Printf("musicbox %s\n\n", version)
 	w := tabwriter.NewWriter(os.Stdout, 0, 4, 2, ' ', 0)
 	fmt.Fprintf(w, "版本:\t%s\n", version)
 	fmt.Fprintf(w, "编译时间:\t%s\n", buildTime)
@@ -98,16 +98,16 @@ func embeddedFrontend() string {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, `singbox-manager — Singbox 运行模式管理
+	fmt.Fprintf(os.Stderr, `musicbox — Linux 代理运行模式管理
 
 用法:
-  singbox-manager serve                      启动守护进程（systemd 服务入口）
-  singbox-manager info                       查看版本/编译时间/平台等构建信息
-  singbox-manager <mode> start|stop          启停模式（tun|socks|tproxy|redir-tproxy）
-  singbox-manager status [--json]            展示各模式/单元/规则状态
-  singbox-manager config sync                同步各模式配置文件
+  musicbox serve                      启动守护进程（systemd 服务入口）
+  musicbox info                       查看版本/编译时间/平台等构建信息
+  musicbox <mode> start|stop          启停模式（tun|socks|tproxy|redir-tproxy）
+  musicbox status [--json]            展示各模式/单元/规则状态
+  musicbox config sync                同步各模式配置文件
 
 提示: 模式操作与 config sync 均经本机守护进程执行，请先确保
-      systemctl start singbox-manager 已运行。
+      systemctl start musicbox 已运行。
 `)
 }

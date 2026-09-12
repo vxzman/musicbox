@@ -1,0 +1,22 @@
+services:
+  musicbox:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: localhost/musicbox:latest
+    container_name: musicbox
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    volumes:
+      - musicbox-config:/etc/sing-box
+      - musicbox-data:/var/lib/sing-box
+      - musicbox-manager:/opt/musicbox
+
+volumes:
+  musicbox-config:
+    driver: local
+  musicbox-data:
+    driver: local
+  musicbox-manager:
+    driver: local

@@ -1,0 +1,64 @@
+#!/bin/sh
+set -eu
+
+usage() {
+    echo "Usage: systemctl {status|start|stop|restart} sing-box@<mode>.service" >&2
+    exit 2
+}
+
+status_mode() {
+    mode=$1
+    json=$(/usr/local/bin/musicbox status --json 2>/dev/null) || {
+        echo "● sing-box@$mode.service - manager unavailable"
+        return 3
+    }
+    details=$(printf '%s' "$json" | sed -n "s/.*\"$mode\":{\([^}]*\)}.*/\1/p")
+    case "$details" in
+        *'"active":true'*)
+            echo "● sing-box@$mode.service - active (running)"
+            return 0
+            ;;
+        *)
+            echo "● sing-box@$mode.service - inactive (dead)"
+            return 3
+            ;;
+    esac
+}
+
+[ "$#" -ge 2 ] || usage
+action=$1
+unit=${2%.service}
+
+case "$unit" in
+    musicbox)
+        case "$action" in
+            status)
+                echo "● musicbox.service - active (container main process)"
+                ;;
+            start|stop|restart)
+                echo "musicbox.service is the container main process"
+                ;;
+            *) usage ;;
+        esac
+        ;;
+    sing-box@*)
+        mode=${unit#sing-box@}
+        case "$action" in
+            status) status_mode "$mode" ;;
+            start|stop|restart)
+                if [ "$action" = restart ]; then
+                    /usr/local/bin/musicbox "$mode" stop || true
+                fi
+                command=$([ "$action" = restart ] && echo start || echo "$action")
+                if /usr/local/bin/musicbox "$mode" "$command" >/dev/null 2>&1; then
+                    echo "sing-box@$mode.service: $command successful"
+                else
+                    echo "sing-box@$mode.service: $command failed" >&2
+                    exit 1
+                fi
+                ;;
+            *) usage ;;
+        esac
+        ;;
+    *) usage ;;
+esac

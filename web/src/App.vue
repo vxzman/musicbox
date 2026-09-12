@@ -98,25 +98,49 @@ const appChipText = computed(() => (!status.value ? '连接中…' : activeLabel
       <div class="noise"></div>
     </div>
 
-    <!-- 缩放外壳：导航 + 主内容整体缩小并居中（zoom 实现，四周留白；
-         fixed 浮层 FAB/snackbar/底部导航保持在外壳之外） -->
-    <div class="app-scale">
+    <!-- 居中面板：导航 + 主内容收进固定宽度窗口，不铺满视口；
+         snackbar / 底部导航留在面板外，仍相对视口定位 -->
+    <div class="app-frame">
       <header class="nav-wrap">
         <nav class="nav-inner" aria-label="主导航">
           <span class="logo">
-            <!-- sing-box 立体开口六边形盒子（与标签页 favicon 同款，代码重绘） -->
+            <!-- MusicBox 原创八音盒图标（与标签页 favicon 同款，代码重绘） -->
             <span class="logo-mark">
-              <svg width="26" height="26" viewBox="0 0 100 100" aria-hidden="true">
-                <polygon points="50,10 90,30 90,70 50,90 10,70 10,30" fill="none" stroke="#6750a4" stroke-width="4" />
-                <polygon points="50,15 85,32 85,68 50,85 15,68 15,32" fill="#f6f1ff" />
-                <polygon points="50,15 85,32 50,45 15,32" fill="#efe8fc" />
-                <polygon points="15,32 50,45 50,85 15,68" fill="#b69ce6" />
-                <polygon points="85,32 50,45 50,85 85,68" fill="#8a6fd0" />
-                <polygon points="85,32 85,68 75,73 75,37" fill="#d9c8f8" opacity="0.5" />
-                <polygon points="50,45 75,37 50,55 25,45" fill="#3d2e5c" opacity="0.8" />
+              <svg width="22" height="22" viewBox="0 0 100 100" aria-hidden="true">
+                <defs>
+                  <linearGradient id="nav-mb-top" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#d0bcff"/>
+                    <stop offset="100%" stop-color="#b69ce6"/>
+                  </linearGradient>
+                  <linearGradient id="nav-mb-left" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#8a6fd0"/>
+                    <stop offset="100%" stop-color="#7354c0"/>
+                  </linearGradient>
+                  <linearGradient id="nav-mb-right" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#6750a4"/>
+                    <stop offset="100%" stop-color="#4f378b"/>
+                  </linearGradient>
+                </defs>
+                <!-- 3D 音乐盒立方体 -->
+                <polygon points="50,18 82,34 50,50 18,34" fill="url(#nav-mb-top)"/>
+                <polygon points="18,34 50,50 50,82 18,66" fill="url(#nav-mb-left)"/>
+                <polygon points="50,50 82,34 82,66 50,82" fill="url(#nav-mb-right)"/>
+                <polyline points="18,34 50,50 82,34" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.6"/>
+                <line x1="50" y1="50" x2="50" y2="82" stroke="#ffffff" stroke-width="1.5" opacity="0.4"/>
+                <!-- 纯白双连音符 ♫ -->
+                <g fill="#ffffff" filter="drop-shadow(0 2px 3px rgba(33, 0, 93, 0.5))">
+                  <ellipse cx="38" cy="62" rx="7.5" ry="5.5" transform="rotate(-20 38 62)"/>
+                  <ellipse cx="58" cy="54" rx="7.5" ry="5.5" transform="rotate(-20 58 54)"/>
+                  <rect x="43" y="30" width="3.5" height="32" rx="1.5"/>
+                  <rect x="63" y="22" width="3.5" height="32" rx="1.5"/>
+                  <polygon points="43,30 66.5,22 66.5,28 43,36"/>
+                </g>
+                <!-- 旋律弧光声波 -->
+                <path d="M 72,16 A 12 12 0 0 1 80,28" stroke="#6750a4" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.9"/>
+                <path d="M 78,11 A 19 19 0 0 1 90,29" stroke="#6750a4" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.6"/>
               </svg>
             </span>
-            <span class="logo-text">Singbox Manager</span>
+            <span class="logo-text">MusicBox</span>
           </span>
 
           <div class="nav-links">

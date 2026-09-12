@@ -1,8 +1,9 @@
 package config
 
-// ManagerConfig 是 /opt/singbox-manager/manager.yaml 的类型化视图：
+// ManagerConfig 是 /opt/musicbox/manager.yaml 的类型化视图：
 // 所有 ip rule 数字、env 变量、模式定义与预定义入站配置的单一事实源。
-// 命名约定：二进制与用户/组保留官方 sing-box，其余统一无连字符 singbox。
+// 命名约定：内核二进制、用户/组、配置目录与 systemd 模板沿用官方 sing-box；
+// 管理器本身统一 musicbox。
 type ManagerConfig struct {
 	Dirs   Dirs             `yaml:"dirs" json:"dirs"`
 	Daemon DaemonSettings   `yaml:"daemon" json:"daemon"`
@@ -29,15 +30,18 @@ type Mode struct {
 	Cleanup *Cleanup `yaml:"cleanup,omitempty" json:"cleanup,omitempty"`
 	Env     *Env     `yaml:"env,omitempty" json:"env,omitempty"`
 	Preset  string   `yaml:"preset,omitempty" json:"preset,omitempty"`
-	// Endpoints 是端点模块数组（JSON），与 config_generic.json 顶层 endpoints
-	// 合并（按 tag 覆盖）生成该模式配置——EP（endpoint）模式用，如 wireguard。
+	// Endpoints 保留字段：旧 manager.yaml 可能仍带 ep 模式残留，加载时丢弃。
 	Endpoints string `yaml:"endpoints,omitempty" json:"endpoints,omitempty"`
 }
 
-// SelfManaged 报告该模式配置是否由用户自管（server，或未配置 endpoints 的
-// EP/EBPF）：生成流程不覆盖，启停前要求用户已放置配置文件。
+// BuiltinModes 是当前维护的四种运行模式。
+var BuiltinModes = []string{"tun", "tproxy", "redir-tproxy", "socks"}
+
+var retiredModes = []string{"server", "ep", "ebpf"}
+
+// SelfManaged 报告该模式配置是否由用户自管（无 preset）：生成流程不覆盖。
 func (m *Mode) SelfManaged() bool {
-	return m.Preset == "" && m.Endpoints == ""
+	return m.Preset == ""
 }
 
 // Routing 承载 tun 模式的策略路由索引：清理逻辑据此派生，不再硬编码数字。
@@ -67,7 +71,8 @@ type Env struct {
 // ─── 默认配置 ────────────────────────────────────────────────
 
 const (
-	DefaultConfigPath = "/opt/singbox-manager/manager.yaml"
+	DefaultConfigPath = "/opt/musicbox/manager.yaml"
+	LegacyConfigPath  = "/opt/singbox-manager/manager.yaml"
 
 	// 与旧 sing-box 面板/脚本保持一致的默认值，迁移时被旧 .conf 覆盖。
 	defaultTproxyPort   = 22026
@@ -138,21 +143,21 @@ const socksPreset = `[
 func Default() *ManagerConfig {
 	return &ManagerConfig{
 		Dirs: Dirs{
-			ConfigDir: "/etc/singbox",
-			DataDir:   "/var/lib/singbox",
+			ConfigDir: "/etc/sing-box",
+			DataDir:   "/var/lib/sing-box",
 		},
 		Daemon: DaemonSettings{
 			// 面板无鉴权：默认仅监听 IPv4（0.0.0.0），不暴露 IPv6。
 			// 需要 IPv6 时显式设置：[::]:8082（仅 IPv6）或 :8082（双栈）。
 			WebAddr:           "0.0.0.0:8082",
-			CliSocket:         "/run/singbox-manager/singbox-manager.sock",
+			CliSocket:         "/run/musicbox/musicbox.sock",
 			ApplyDelayMs:      1000,
 			ReconcileInterval: "5s",
 		},
 		Modes: map[string]*Mode{
 			"tun": {
 				Label:  "TUN",
-				Unit:   "singbox@tun",
+				Unit:   "sing-box@tun",
 				Config: "config_tun.json",
 				Routing: &Routing{
 					RuleIndex:  9000,
@@ -165,7 +170,7 @@ func Default() *ManagerConfig {
 			},
 			"tproxy": {
 				Label:  "TPROXY",
-				Unit:   "singbox@tproxy",
+				Unit:   "sing-box@tproxy",
 				Config: "config_tproxy.json",
 				Env: &Env{
 					TproxyPort:    defaultTproxyPort,
@@ -179,7 +184,7 @@ func Default() *ManagerConfig {
 			},
 			"redir-tproxy": {
 				Label:  "REDIR-TPROXY",
-				Unit:   "singbox@redir-tproxy",
+				Unit:   "sing-box@redir-tproxy",
 				Config: "config_redir-tproxy.json",
 				Env: &Env{
 					TproxyPort:    defaultTproxyPort,
@@ -194,33 +199,9 @@ func Default() *ManagerConfig {
 			},
 			"socks": {
 				Label:  "SOCKS",
-				Unit:   "singbox@socks",
+				Unit:   "sing-box@socks",
 				Config: "config_socks.json",
 				Preset: socksPreset,
-			},
-			// server 模式：配置文件由用户自行管理（config_server.json 需用户
-			// 自己放入配置目录），管理器只负责启停与监控，config sync 跳过。
-			// 配置管理页允许直接编辑保存（sing-box check 校验后写入）。
-			"server": {
-				Label:  "SERVER",
-				Unit:   "singbox@server",
-				Config: "config_server.json",
-			},
-			// EP（endpoint）模式：在 config_generic.json 基础上插入顶层
-			// endpoints 模块（与 dns/inbounds 平行，按 tag 合并）。endpoints
-			// 留空时视同用户自管——在系统设置页填入模块 JSON 后开始生成。
-			"ep": {
-				Label:  "EP",
-				Unit:   "singbox@ep",
-				Config: "config_ep.json",
-			},
-			// EBPF 模式：在 config_generic.json 基础上插入 ebpf 入站模块
-			// （测试版 sing-box 的复杂入站，类似 tun）。preset 留空时视同
-			// 用户自管——在系统设置页填入入站 JSON 后开始生成。
-			"ebpf": {
-				Label:  "EBPF",
-				Unit:   "singbox@ebpf",
-				Config: "config_ebpf.json",
 			},
 		},
 	}

@@ -11,8 +11,8 @@ import (
 	"net/http"
 	"os"
 
-	"singbox-manager/internal/config"
-	"singbox-manager/internal/lifecycle"
+	"musicbox/internal/config"
+	"musicbox/internal/lifecycle"
 )
 
 type API struct {
@@ -164,7 +164,7 @@ func (a *API) handleGetModeConfig(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"content": content})
 }
 
-// handlePutModeConfig 保存用户自管模式（server 等）的配置文件。
+// handlePutModeConfig 保存用户自管模式的配置文件。
 // 生成型模式（有 preset/endpoints）配置由 sync 流程管理，拒绝直接写入。
 func (a *API) handlePutModeConfig(w http.ResponseWriter, r *http.Request) {
 	mode := r.PathValue("mode")

@@ -1,11 +1,11 @@
-# dev fixture：相对目录以本文件所在位置为基准解析，避免写死机器路径
+# 容器默认 manager.yaml：无 sing-box 系统用户，回环避免用 routing_mark。
 dirs:
-  config_dir: etc-sing-box
+  config_dir: /etc/sing-box
   data_dir: /var/lib/sing-box
 
 daemon:
-  web_addr: "127.0.0.1:8082"
-  cli_socket: dev/musicbox.sock
+  web_addr: "0.0.0.0:8082"
+  cli_socket: /run/musicbox/musicbox.sock
   apply_delay_ms: 1000
   reconcile_interval: 5s
 
@@ -43,7 +43,6 @@ modes:
     config: config_tproxy.json
     env:
       tproxy_port: 22026
-      exclude_gid: 988
       routing_mark: 6666
       fwmark: 1
       table_id: 100
@@ -65,7 +64,6 @@ modes:
     env:
       tproxy_port: 22026
       redirect_port: 22025
-      exclude_gid: 988
       routing_mark: 6666
       fwmark: 1
       table_id: 100

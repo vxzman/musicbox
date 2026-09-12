@@ -1,7 +1,7 @@
 // Package lifecycle 是规则生命周期的编排者，守护进程的唯一写入口：
 //
 //   - StartMode / StopMode：模式互斥切换、启动后延迟套规则、停止后清理
-//   - watchUnits：dbus 信号联动 —— singbox@ 实例死亡即清规则（同生共死）
+//   - watchUnits：服务状态联动 —— sing-box@ 实例死亡即清规则（同生共死）
 //   - watchTun：tun0 消失后清理残留 ip rule / nft 表
 //   - reconcile：定期对比期望状态与实际状态，兜底自愈（守护崩溃/手工干预）
 //
@@ -20,21 +20,21 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"singbox-manager/internal/config"
-	"singbox-manager/internal/intercept"
-	"singbox-manager/internal/netlink"
-	"singbox-manager/internal/systemd"
+	"musicbox/internal/config"
+	"musicbox/internal/intercept"
+	"musicbox/internal/netlink"
+	"musicbox/internal/service"
 )
 
 type Manager struct {
 	cfg *config.ManagerConfig
-	sys *systemd.Client
+	sys service.Manager
 
 	mu     sync.Mutex // 串行化模式操作与规则写入
 	recent map[string]time.Time
 }
 
-func New(cfg *config.ManagerConfig, sys *systemd.Client) *Manager {
+func New(cfg *config.ManagerConfig, sys service.Manager) *Manager {
 	return &Manager{cfg: cfg, sys: sys, recent: map[string]time.Time{}}
 }
 
@@ -67,8 +67,7 @@ func (m *Manager) StartMode(ctx context.Context, mode string) error {
 		return fmt.Errorf("未知模式: %s", mode)
 	}
 
-	// 用户自管模式（无 preset 且无 endpoints，如 server）：配置文件必须由
-	// 用户预先放置，管理器不生成、不校验，只负责启停。
+	// 用户自管模式（无 preset）：配置文件必须预先放置，管理器不生成。
 	if md.SelfManaged() {
 		path := filepath.Join(m.cfg.ConfigDir(), md.Config)
 		if _, err := os.Stat(path); err != nil {
@@ -253,7 +252,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	prevActive := map[string]bool{}
 	unitNames := map[string]string{} // mode → normalized unit
 	for _, md := range m.cfg.Modes {
-		full := systemd.Normalize(md.Unit)
+		full := service.Normalize(md.Unit)
 		unitNames[md.Unit] = full
 		prevActive[full] = m.sys.IsActive(ctx, md.Unit)
 	}
@@ -266,7 +265,7 @@ func (m *Manager) Run(ctx context.Context) error {
 		case <-ctx.Done():
 			return ctx.Err()
 		case err := <-errCh:
-			log.Printf("[lifecycle] dbus 订阅错误: %v", err)
+			log.Printf("[lifecycle] 服务状态订阅错误: %v", err)
 		case snapshot := <-updates:
 			for mode, md := range m.cfg.Modes {
 				full := unitNames[md.Unit]
@@ -282,7 +281,7 @@ func (m *Manager) Run(ctx context.Context) error {
 					}
 				}
 				if prevActive[full] && !active {
-					// singbox@ 实例死亡 → 清规则（同生共死）
+					// sing-box@ 实例死亡 → 清规则（同生共死）
 					log.Printf("[lifecycle] %s 已停止，清理规则", md.Unit)
 					m.onUnitDown(mode)
 				}
@@ -294,7 +293,7 @@ func (m *Manager) Run(ctx context.Context) error {
 	}
 }
 
-// onUnitDown 在 singbox@ 实例停止后清理对应模式规则。
+// onUnitDown 在 sing-box@ 实例停止后清理对应模式规则。
 func (m *Manager) onUnitDown(mode string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -401,7 +400,7 @@ func (m *Manager) Status(ctx context.Context) *Status {
 				}
 			}
 		case "tun":
-			// tun 运行时 singbox 自己会向路由表加规则（auto-route 的正常行为），
+			// tun 运行时 sing-box 自己会向路由表加规则（auto-route 的正常行为），
 			// 只有「单元已停但规则仍在」才算残留。
 			ms.Rules = "clean"
 			if md.Routing != nil {
@@ -419,8 +418,23 @@ func (m *Manager) Status(ctx context.Context) *Status {
 			}
 		}
 		st.Modes[name] = ms
-		if ms.Active && st.ActiveMode == "" {
+	}
+	// 非容器：以 systemd 上真实运行的 sing-box@<mode> 为准覆盖首页活跃模式。
+	for _, inst := range m.sys.ActiveInstances(ctx, "sing-box") {
+		ms, ok := st.Modes[inst]
+		if !ok {
+			continue
+		}
+		ms.Active = true
+		if ms.UnitState != "active" && ms.UnitState != "activating" && ms.UnitState != "reloading" {
+			ms.UnitState = "active"
+		}
+		st.Modes[inst] = ms
+	}
+	for _, name := range config.BuiltinModes {
+		if ms, ok := st.Modes[name]; ok && ms.Active {
 			st.ActiveMode = name
+			break
 		}
 	}
 	return st

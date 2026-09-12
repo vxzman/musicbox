@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════════════════════════
-   Singbox Manager — Google MD3 + Glass（玻璃氛围版）
+   MusicBox — Google MD3 + Glass（玻璃氛围版）
    参考「Google MD3 + Glass 设计美学.md」：
    · 紫罗兰 #6750A4 种子 · 三颗光斑氛围 · 三层玻璃体系 · 语义层级
    · "Material You — but make it breathe."
@@ -39,10 +39,15 @@
   /* Glass 氛围层（Level 1 · 环境光） */
   --glass-surface: rgba(255, 255, 255, 0.5);
   --glass-surface-strong: rgba(255, 255, 255, 0.68); /* 供 color-mix 使用，保持纯色 */
-  --glass-surface-text: rgba(255, 255, 255, 0.82); /* 文本输入区：更高不透明度 */
+  /* 输入/编辑井：比卡片更透，才能看出背后光斑被模糊 */
+  --glass-surface-text: rgba(255, 255, 255, 0.28);
   /* 渐变玻璃：左上高光 → 右下通透，模拟厚玻璃的明暗走向 */
   --glass-gradient: linear-gradient(155deg, rgba(255, 255, 255, 0.74) 0%, rgba(255, 255, 255, 0.42) 100%);
   --glass-gradient-strong: linear-gradient(155deg, rgba(255, 255, 255, 0.84) 0%, rgba(255, 255, 255, 0.56) 100%);
+  /* 输入井：白高光 + 极浅紫， nested 在卡片里也能看出玻璃而不是纸片 */
+  --glass-field: linear-gradient(155deg, rgba(255, 255, 255, 0.34) 0%, rgba(103, 80, 164, 0.08) 100%);
+  --glass-field-strong: linear-gradient(155deg, rgba(255, 255, 255, 0.24) 0%, rgba(103, 80, 164, 0.07) 100%);
+  --glass-panel: linear-gradient(155deg, rgba(255, 255, 255, 0.5) 0%, rgba(234, 221, 255, 0.18) 100%);
   --glass-nav-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.82) 0%, rgba(255, 255, 255, 0.5) 100%);
   --glass-border: rgba(255, 255, 255, 0.55);
   --glass-nav-border: rgba(255, 255, 255, 0.6);
@@ -330,62 +335,62 @@ body {
   .editor,
   .save-bar,
   .nav-inner,
+  .app-frame,
   .snackbar,
   .chip,
   .radio-card,
   md-outlined-segmented-button-set,
+  md-outlined-text-field,
   .bottom-nav md-navigation-bar {
     background: #ffffff;
   }
 }
 
-/* ═══════════════ 2. 应用外壳 ═══════════════ */
+/* ═══════════════ 2. 应用外壳：居中紧凑面板，不铺满视口 ═══════════════ */
 .app {
-  /* 整体缩放因子：页面缩小 + 四周留白 */
-  --app-zoom: 0.94;
+  --app-max: 760px;
   position: relative;
   z-index: 1;
   display: flex;
   flex-direction: column;
-  min-height: 100vh;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
 }
 
-/* 缩放外壳：导航 + 主内容整体缩小并居中。
-   必须用 zoom 而非 transform：transform 会让内部 sticky 元素随滚动漂移
-   （变换原点锚在元素盒上），并把 fixed 后代变成相对定位。
-   zoom: z 配合 width: calc(100% * z) → 布局宽恰好等于父级宽，
-   渲染缩小为 z 并水平居中（margin: 0 auto），四周自然留白。 */
-.app-scale {
+.app.view-config {
+  --app-max: 920px;
+}
+
+/* 面板窗口：宽度封顶、高度随内容，超出视口时内部滚动。
+   短页面（运行状态）垂直居中浮在氛围层上；长页面顶满 max-height。 */
+.app-frame {
   position: relative;
   z-index: 1;
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--app-max), 100%);
+  max-height: calc(100dvh - 48px);
   min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
-@supports (zoom: 1) {
-  .app-scale {
-    zoom: var(--app-zoom);
-    width: calc(100% * var(--app-zoom));
-    margin: 0 auto;
-  }
-
-  /* 视口固定浮层同步缩放，与页面比例一致（位于 .app-scale 之外，不继承其自定义属性） */
-  .snackbar {
-    zoom: var(--app-zoom);
-  }
+  min-height: 0;
+  overflow: hidden;
+  border-radius: var(--md-sys-shape-corner-extra-large);
+  background: linear-gradient(165deg, rgba(255, 255, 255, 0.36) 0%, rgba(255, 255, 255, 0.16) 100%);
+  backdrop-filter: blur(28px) saturate(160%);
+  -webkit-backdrop-filter: blur(28px) saturate(160%);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
 }
 
 /* ═══════════════ 3. 浮动胶囊导航（Level 2 — Nav）═══════════════ */
 .nav-wrap {
-  position: sticky;
-  top: 16px;
+  position: relative;
   z-index: 100;
+  flex-shrink: 0;
   display: flex;
   justify-content: center;
-  padding: 0 16px;
-  margin-top: 16px;
+  padding: 12px 12px 0;
   animation: nav-in 0.4s cubic-bezier(0.2, 0, 0, 1) both;
 }
 
@@ -393,10 +398,9 @@ body {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
-  max-width: 1120px;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border-radius: 999px;
   background: var(--glass-nav-gradient);
   backdrop-filter: blur(24px) saturate(175%);
@@ -416,9 +420,9 @@ body {
 }
 
 .logo-mark {
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -437,15 +441,16 @@ body {
 .nav-links {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-wrap: nowrap;
+  min-width: 0;
 }
 
 .nav-item {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: 6px 12px;
   border: none;
   background: none;
   border-radius: 999px;
@@ -528,14 +533,28 @@ md-linear-progress {
 /* 悬浮抬升仅用于轻交互卡（表单卡/编辑器不抬） */
 .mode-row:hover,
 .radio-card:hover {
-  background: var(--glass-gradient-strong);
   transform: translateY(-2px);
   box-shadow: var(--glass-shadow-hover);
 }
 
+.mode-row:hover {
+  background: var(--glass-gradient-strong);
+}
+
+.radio-card:hover {
+  background: linear-gradient(155deg, rgba(255, 255, 255, 0.42) 0%, rgba(103, 80, 164, 0.1) 100%);
+}
+
+/* 表单卡 / 配置双栏：比状态行更透，让氛围光斑透过，避免纯白实心底 */
+.card,
+.file-nav,
+.editor-pane {
+  background: var(--glass-panel);
+}
+
 /* 内容型卡片内边距 */
 .card {
-  padding: 24px;
+  padding: 20px;
 }
 
 /* ═══════════════ 6. 芯片（M3 assist-chip）───────────────── */
@@ -613,25 +632,27 @@ md-linear-progress {
 .main {
   position: relative;
   z-index: 10;
-  flex: 1;
+  flex: 1 1 auto;
   width: 100%;
-  max-width: 1120px;
-  margin: 24px auto 0;
-  padding: 0 24px 88px;
   min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 16px 20px;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* ═══════════════ 8. 页面头部 ═══════════════ */
 .page-head {
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   animation: rise 0.35s ease both;
 }
 
 .page-head h1 {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font: 400 28px/36px var(--md-ref-typeface-brand);
+  gap: 10px;
+  font: 400 22px/28px var(--md-ref-typeface-brand);
   color: var(--ink);
 }
 
@@ -655,9 +676,9 @@ md-linear-progress {
   overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 28px;
-  margin-bottom: 16px;
+  gap: 16px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
   animation: rise 0.35s ease both;
 }
 
@@ -680,9 +701,9 @@ md-linear-progress {
 }
 
 .hero-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -697,7 +718,7 @@ md-linear-progress {
 }
 
 .hero-title {
-  font: 400 24px/32px var(--md-ref-typeface-brand);
+  font: 400 20px/28px var(--md-ref-typeface-brand);
   color: var(--ink);
 }
 
@@ -710,14 +731,14 @@ md-linear-progress {
 .mode-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .mode-row {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 14px 18px;
+  gap: 12px;
+  padding: 10px 14px;
   animation: rise 0.35s ease both;
 }
 
@@ -733,8 +754,8 @@ md-linear-progress {
 }
 
 .mode-icon {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
   display: grid;
   place-items: center;
@@ -853,16 +874,20 @@ md-linear-progress {
 /* ═══════════════ 10. 表单 ═══════════════ */
 .field {
   display: block;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 md-outlined-text-field {
   width: 100%;
-  --md-outlined-text-field-container-color: var(--glass-surface-text);
-  --md-outlined-text-field-outline-color: var(--md-sys-color-outline-variant);
-  --md-outlined-text-field-hover-outline-color: var(--md-sys-color-outline-variant);
+  --md-outlined-text-field-outline-color: var(--glass-border);
+  --md-outlined-text-field-hover-outline-color: color-mix(in srgb, var(--md-sys-color-primary) 45%, var(--glass-border));
   --md-outlined-text-field-focus-outline-color: var(--md-sys-color-primary);
   --md-outlined-text-field-container-shape: 12px;
+  background: var(--glass-field);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  border-radius: 12px;
+  box-shadow: var(--glass-highlight);
 }
 
 .row {
@@ -882,7 +907,7 @@ md-outlined-text-field {
   font: 500 14px/20px var(--md-ref-typeface-brand);
   letter-spacing: 0.1px;
   color: var(--ink);
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .section-title svg {
@@ -900,17 +925,17 @@ md-outlined-text-field {
 .radio-card {
   position: relative;
   flex: 1;
-  min-width: 200px;
+  min-width: 180px;
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 16px;
+  padding: 14px;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
-  background: var(--glass-gradient);
-  backdrop-filter: blur(22px) saturate(175%);
-  -webkit-backdrop-filter: blur(22px) saturate(175%);
-  box-shadow: var(--glass-shadow);
+  background: var(--glass-field);
+  backdrop-filter: blur(18px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(170%);
+  box-shadow: var(--glass-highlight);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
@@ -923,11 +948,11 @@ md-outlined-text-field {
 
 .radio-card.selected {
   border-color: var(--md-sys-color-primary);
-  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary), var(--glass-shadow);
+  box-shadow: inset 0 0 0 1px var(--md-sys-color-primary), var(--glass-highlight);
   background: linear-gradient(
     155deg,
-    color-mix(in srgb, var(--md-sys-color-primary) 10%, rgba(255, 255, 255, 0.84)) 0%,
-    color-mix(in srgb, var(--md-sys-color-primary) 10%, rgba(255, 255, 255, 0.56)) 100%
+    color-mix(in srgb, var(--md-sys-color-primary) 14%, rgba(255, 255, 255, 0.42)) 0%,
+    color-mix(in srgb, var(--md-sys-color-primary) 10%, rgba(255, 255, 255, 0.14)) 100%
   );
 }
 
@@ -966,8 +991,8 @@ md-outlined-text-field.code {
 /* ═══════════════ 11. 配置页：双栏布局 ═══════════════ */
 .config-layout {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
-  gap: 16px;
+  grid-template-columns: 252px minmax(0, 1fr);
+  gap: 12px;
   align-items: stretch;
 }
 
@@ -976,7 +1001,6 @@ md-outlined-text-field.code {
   flex-direction: column;
   gap: 2px;
   padding: 10px;
-  align-self: start;
 }
 
 .file-nav-title {
@@ -1057,9 +1081,9 @@ md-outlined-text-field.code {
 .editor-pane {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-width: 0;
-  padding: 20px;
+  padding: 16px;
 }
 
 .toolbar {
@@ -1078,30 +1102,40 @@ md-outlined-text-field.code {
 }
 
 .editor {
-  background: var(--glass-gradient-strong);
-  backdrop-filter: blur(20px) saturate(170%);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  background: var(--glass-field-strong);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   border: 1px solid var(--glass-border);
   border-radius: 16px;
-  box-shadow: var(--glass-shadow);
-  padding: 12px;
-  min-height: 540px;
+  box-shadow: var(--glass-highlight), 0 2px 10px rgba(103, 80, 164, 0.08);
+  padding: 10px;
+  min-height: 360px;
 }
 
+/* 编辑井本身已是玻璃，内层输入框不再叠一层实底 */
 .editor md-outlined-text-field {
-  --md-outlined-text-field-container-color: transparent;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  box-shadow: none;
+  --md-outlined-text-field-outline-color: color-mix(in srgb, var(--glass-border) 55%, transparent);
+  --md-outlined-text-field-hover-outline-color: color-mix(in srgb, var(--md-sys-color-primary) 35%, var(--glass-border));
+  --md-outlined-text-field-focus-outline-color: var(--md-sys-color-primary);
 }
 
 .editor--readonly {
-  background: color-mix(in srgb, var(--glass-surface-strong) 70%, var(--md-sys-color-surface-variant));
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--md-sys-color-surface-variant) 22%, rgba(255, 255, 255, 0.36)) 0%,
+    color-mix(in srgb, var(--md-sys-color-surface-variant) 18%, rgba(255, 255, 255, 0.12)) 100%
+  );
 }
 
 .editor--readonly md-outlined-text-field {
   --md-outlined-text-field-input-text-color: var(--ink-2);
-  --md-outlined-text-field-outline-color: var(--md-sys-color-outline-variant);
-  --md-outlined-text-field-hover-outline-color: var(--md-sys-color-outline-variant);
-  --md-outlined-text-field-focus-outline-color: var(--md-sys-color-outline-variant);
-  --md-outlined-text-field-container-color: transparent;
+  --md-outlined-text-field-outline-color: color-mix(in srgb, var(--glass-border) 45%, transparent);
+  --md-outlined-text-field-hover-outline-color: color-mix(in srgb, var(--glass-border) 45%, transparent);
+  --md-outlined-text-field-focus-outline-color: color-mix(in srgb, var(--glass-border) 55%, transparent);
 }
 
 /* ═══════════════ 12. 设置页 ═══════════════ */
@@ -1140,16 +1174,16 @@ md-outlined-segmented-button {
    滚动时内容从栏下经过也不会糊成一团 */
 .save-bar {
   position: sticky;
-  bottom: 16px;
+  bottom: 0;
   z-index: 20;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  margin-top: 16px;
-  padding: 12px 16px;
+  margin-top: 12px;
+  padding: 10px 14px;
   border-radius: 16px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.72) 0%, rgba(255, 255, 255, 0.46) 100%);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.48) 0%, rgba(234, 221, 255, 0.22) 100%);
   backdrop-filter: blur(24px) saturate(175%);
   -webkit-backdrop-filter: blur(24px) saturate(175%);
   border: 1px solid var(--glass-border);
@@ -1271,15 +1305,6 @@ md-outlined-segmented-button {
 .c-socks {
   --mode-color: #3a6b48;
 }
-.c-server {
-  --mode-color: #006874;
-}
-.c-ep {
-  --mode-color: #00538c;
-}
-.c-ebpf {
-  --mode-color: #8e3b7d;
-}
 
 /* ═══════════════ 18. 底部导航 / 移动端 ═══════════ */
 .bottom-nav {
@@ -1300,14 +1325,38 @@ md-outlined-segmented-button {
 }
 
 @media (max-width: 760px) {
+  .app {
+    --app-max: 100%;
+    align-items: stretch;
+    justify-content: flex-start;
+    padding: 0;
+    min-height: 100dvh;
+    height: auto;
+  }
+
+  .app.view-config {
+    --app-max: 100%;
+  }
+
+  .app-frame {
+    width: 100%;
+    max-height: none;
+    min-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    overflow: visible;
+  }
+
   .nav-wrap {
-    top: 8px;
-    margin-top: 8px;
+    padding: 8px 12px 0;
   }
 
   .nav-inner {
-    max-width: none;
-    padding: 8px 12px;
+    padding: 6px 10px;
   }
 
   .nav-links {
@@ -1315,32 +1364,28 @@ md-outlined-segmented-button {
   }
 
   .main {
-    padding: 20px 16px 120px;
-    margin-top: 16px;
+    overflow: visible;
+    padding: 12px 12px calc(112px + env(safe-area-inset-bottom));
   }
 
   .radio-row {
     flex-direction: column;
   }
-  .hero {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 
-  /* 模式行换行：名称行在上，芯片与按钮各占一行 */
+  /* 模式行换行：名称在上，芯片与开关共用第二行 */
   .mode-row {
     flex-wrap: wrap;
   }
   .mode-body {
-    flex-basis: calc(100% - 76px);
+    flex-basis: calc(100% - 64px);
   }
   .mode-chips {
     order: 3;
-    flex-basis: 100%;
+    flex: 1;
   }
   .mode-actions {
     order: 4;
-    flex-basis: 100%;
+    margin-left: auto;
   }
 
   /* 配置页：导航列表转横向滚动 */
@@ -1362,7 +1407,7 @@ md-outlined-segmented-button {
     display: none;
   }
   .editor {
-    min-height: 380px;
+    min-height: 280px;
   }
 
   .bottom-nav {
@@ -1383,7 +1428,7 @@ md-outlined-segmented-button {
   }
 
   .save-bar {
-    bottom: calc(92px + env(safe-area-inset-bottom) + 8px);
+    bottom: 8px;
   }
 }
 

@@ -1,5 +1,7 @@
 # ─── 构建产物 ───────────────────────────────
+/musicbox
 /singbox-manager
+/build/
 
 # ─── 前端 ───────────────────────────────────
 web/node_modules/
@@ -8,10 +10,12 @@ web/dist/*
 !web/dist/index.html
 
 # ─── 开发夹具（本地） ────────────────────────
+dev/*.sock
+dev/musicbox.sock
 dev/singbox-manager.sock
 # 由 config sync 生成的模式配置不入库，仅保留模板
-dev/etc-singbox/config_*.json
-!dev/etc-singbox/config_generic.json
+dev/etc-sing-box/config_*.json
+!dev/etc-sing-box/config_generic.json
 
 # ─── 旧版 bash 参考实现（不随发布提供）───────
 bash/

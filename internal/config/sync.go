@@ -61,7 +61,7 @@ func SaveGeneral(c *ManagerConfig, content string) error {
 	return SyncAll(c, content)
 }
 
-// SaveModeConfig 保存用户自管模式（server 等）的配置文件：sing-box check
+// SaveModeConfig 保存用户自管模式的配置文件：sing-box check
 // 校验后直接写入。不触发 SyncAll——自管模式配置不会被生成流程覆盖。
 func SaveModeConfig(c *ManagerConfig, mode, content string) error {
 	if err := testSingBoxConfig(c, content); err != nil {
@@ -236,7 +236,7 @@ func testSingBoxConfig(c *ManagerConfig, content string) error {
 		return nil
 	}
 
-	tmpDir, err := os.MkdirTemp("", "singbox-manager-test-*")
+	tmpDir, err := os.MkdirTemp("", "musicbox-test-*")
 	if err != nil {
 		return err
 	}

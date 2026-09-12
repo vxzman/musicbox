@@ -1,5 +1,6 @@
-// Package systemd 封装与 systemd 的 dbus 交互：单元启停、状态查询、
-// 状态变化订阅（实时监控的数据源）。
+//go:build !container
+
+// Package systemd 用 systemd D-Bus 实现 service.Manager。
 package systemd
 
 import (
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/coreos/go-systemd/v22/dbus"
+
+	"musicbox/internal/service"
 )
 
 const opTimeout = 60 * time.Second
@@ -17,20 +20,10 @@ type Client struct {
 	conn *dbus.Conn
 }
 
-// Normalize 补全单元名后缀："singbox@tun" → "singbox@tun.service"。
-// 不带后缀的实例名会在部分 systemd 版本的 StartUnit 校验中被拒绝
-// （"Unit name %s is not valid."），systemctl 客户端也是先补后缀再调 dbus。
-// 另外 ListUnits 返回的快照 key 恒为完整名，消费方必须用归一化名匹配。
-func Normalize(unit string) string {
-	if unit == "" {
-		return unit
-	}
-	// 已带后缀（如 singbox@tun.service / foo.socket）则原样返回
-	if i := strings.LastIndex(unit, "."); i >= 0 && i > strings.LastIndex(unit, "@") {
-		return unit
-	}
-	return unit + ".service"
-}
+var _ service.Manager = (*Client)(nil)
+
+// Normalize 保留给 systemd 后端调用方；新代码应使用 service.Normalize。
+func Normalize(unit string) string { return service.Normalize(unit) }
 
 func New() (*Client, error) {
 	// 注意：不能传带超时的 ctx 并随后 cancel——godbus 的 WithContext(ctx)
@@ -104,9 +97,79 @@ func (c *Client) IsActive(ctx context.Context, unit string) bool {
 	return false
 }
 
-// SubscribeStates 订阅单元状态变化：每 interval 推送一次「发生变化的单元」
-// 快照（map[unit]*UnitStatus，被删除的单元值为 nil）。未变化的单元不在
-// 快照中，消费方需自行维护上一次状态做对比。
-func (c *Client) SubscribeStates(interval time.Duration) (<-chan map[string]*dbus.UnitStatus, <-chan error) {
-	return c.conn.SubscribeUnits(interval)
+// ActiveInstances 查询 systemd 上正在运行的 template@instance，例如
+// template=sing-box 且 sing-box@tun.service 为 active 时返回 ["tun"]。
+func (c *Client) ActiveInstances(ctx context.Context, template string) []string {
+	if template == "" {
+		return nil
+	}
+	units, err := c.conn.ListUnitsByPatternsContext(ctx,
+		[]string{"active", "activating", "reloading"},
+		[]string{template + "@*.service"})
+	if err != nil {
+		return nil
+	}
+	prefix := template + "@"
+	out := make([]string, 0, len(units))
+	seen := map[string]struct{}{}
+	for _, u := range units {
+		name := u.Name
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		inst := strings.TrimSuffix(strings.TrimPrefix(name, prefix), ".service")
+		if inst == "" {
+			continue
+		}
+		if _, ok := seen[inst]; ok {
+			continue
+		}
+		seen[inst] = struct{}{}
+		out = append(out, inst)
+	}
+	return out
+}
+
+// SubscribeStates 把 systemd 快照转成后端无关的 service.UnitStatus。
+// 被删除的单元值为 nil。
+func (c *Client) SubscribeStates(interval time.Duration) (<-chan map[string]*service.UnitStatus, <-chan error) {
+	rawUpdates, rawErrors := c.conn.SubscribeUnits(interval)
+	updates := make(chan map[string]*service.UnitStatus)
+	errs := make(chan error)
+
+	go func() {
+		defer close(updates)
+		defer close(errs)
+		for {
+			select {
+			case snapshot, ok := <-rawUpdates:
+				if !ok {
+					return
+				}
+				converted := make(map[string]*service.UnitStatus, len(snapshot))
+				for name, status := range snapshot {
+					if status == nil {
+						converted[name] = nil
+						continue
+					}
+					converted[name] = &service.UnitStatus{
+						Name:        status.Name,
+						Description: status.Description,
+						LoadState:   status.LoadState,
+						ActiveState: status.ActiveState,
+						SubState:    status.SubState,
+					}
+				}
+				updates <- converted
+			case err, ok := <-rawErrors:
+				if !ok {
+					rawErrors = nil
+					continue
+				}
+				errs <- err
+			}
+		}
+	}()
+
+	return updates, errs
 }

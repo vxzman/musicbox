@@ -10,16 +10,13 @@ const props = defineProps<{
 
 defineEmits<{ (e: 'action', mode: string, action: 'start' | 'stop'): void }>()
 
-const modeOrder = ['tun', 'tproxy', 'redir-tproxy', 'socks', 'server', 'ep', 'ebpf']
+const modeOrder = ['tun', 'tproxy', 'redir-tproxy', 'socks']
 
 const modeIcons: Record<string, string> = {
   tun: 'activity',
   tproxy: 'shuffle',
   'redir-tproxy': 'git-merge',
   socks: 'zap',
-  server: 'server',
-  ep: 'layers',
-  ebpf: 'cpu',
 }
 
 const entries = computed(() => {
@@ -68,7 +65,7 @@ function unitClass(s: string): string {
 <template>
   <div>
     <div class="page-head">
-      <h1><Icon name="activity" :size="26" /> 运行状态</h1>
+      <h1><Icon name="activity" :size="22" /> 运行状态</h1>
     </div>
 
     <!-- 摘要 Hero：模式色氛围渗入 -->
@@ -76,7 +73,7 @@ function unitClass(s: string): string {
       <div class="hero-icon">
         <Icon
           :name="status?.active_mode ? (modeIcons[status.active_mode] ?? 'zap') : 'activity'"
-          :size="30"
+          :size="24"
         />
       </div>
       <div class="hero-body">

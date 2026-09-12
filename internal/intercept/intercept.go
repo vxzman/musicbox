@@ -1,6 +1,6 @@
 // Package intercept 通过调用系统 ip / nft 命令实现透明代理的网络接管。
 //
-// 设计目标：核心无关、零依赖——不 import 任何 singbox 代码，只依赖 iproute2
+// 设计目标：核心无关、零依赖——不 import 任何 sing-box 代码，只依赖 iproute2
 // 与 nftables 命令行工具，参数全部由 Config 提供，因此可直接复用于其他代理
 // 核心（sing-box、xray 等）的管理工具。以后若有跨项目需求，本目录可整体
 // 抽出为独立 Go module。

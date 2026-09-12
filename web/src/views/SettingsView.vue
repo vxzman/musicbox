@@ -16,10 +16,6 @@ const saving = ref(false)
 const bypassTproxy = ref<'gid' | 'mark'>('gid')
 const bypassRedir = ref<'gid' | 'mark'>('gid')
 
-// EP 端点模块 / EBPF 入站模块 / SOCKS 入站端口（模块 JSON 复杂，
-// 用字段编辑：ep/ebpf 编辑模块本身，socks 只编辑端口）
-const epEndpoints = ref('')
-const ebpfPreset = ref('')
 const socksPort = ref(20080)
 
 const tabs = [
@@ -28,9 +24,6 @@ const tabs = [
   { key: 'tproxy', label: 'TPROXY' },
   { key: 'redir', label: 'REDIR' },
   { key: 'socks', label: 'SOCKS' },
-  { key: 'ep', label: 'EP' },
-  { key: 'ebpf', label: 'EBPF' },
-  { key: 'server', label: 'SERVER' },
 ]
 const tab = ref('daemon')
 
@@ -85,8 +78,6 @@ onMounted(async () => {
     settings.value = await fetchSettings()
     if ((settings.value.modes.tproxy?.env?.exclude_gid ?? 0) <= 0) bypassTproxy.value = 'mark'
     if ((settings.value.modes['redir-tproxy']?.env?.exclude_gid ?? 0) <= 0) bypassRedir.value = 'mark'
-    epEndpoints.value = settings.value.modes.ep?.endpoints ?? ''
-    ebpfPreset.value = settings.value.modes.ebpf?.preset ?? ''
     socksPort.value = readSocksPort(settings.value.modes.socks?.preset)
   } catch (e) {
     message.value = { ok: false, text: (e as Error).message }
@@ -119,8 +110,6 @@ async function save() {
     }
 
     if (s.modes.socks) modes.socks = { preset: buildSocksPreset(socksPort.value, s.modes.socks.preset) }
-    if (s.modes.ep) modes.ep = { endpoints: epEndpoints.value }
-    if (s.modes.ebpf) modes.ebpf = { preset: ebpfPreset.value }
 
     await saveSettings(update)
     message.value = { ok: true, text: '设置已保存' }
@@ -135,7 +124,7 @@ async function save() {
 <template>
   <div v-if="settings">
     <div class="page-head">
-      <h1><Icon name="sliders" :size="26" /> 系统设置</h1>
+      <h1><Icon name="sliders" :size="22" /> 系统设置</h1>
     </div>
 
     <!-- 分段选项卡（玻璃胶囊） -->
@@ -253,7 +242,7 @@ async function save() {
           <md-radio name="bypass-tproxy" :checked="bypassTproxy === 'gid'"></md-radio>
           <span class="radio-text">
             <b>GID 放行</b>
-            <span>meta skgid · 放行 sing-box 用户组流量</span>
+            <span>meta skgid · 放行代理服务用户组流量</span>
           </span>
         </label>
         <label class="radio-card" :class="{ selected: bypassTproxy === 'mark' }" @click="bypassTproxy = 'mark'" v-ripple>
@@ -267,7 +256,7 @@ async function save() {
       <div class="row" style="margin-top: 14px">
         <div class="field">
           <md-outlined-text-field
-            label="排除 GID（sing-box 用户组）"
+            label="排除 GID（代理服务用户组）"
             type="number"
             :value="settings.modes.tproxy!.env!.exclude_gid"
             @input="onNum($event, (v) => (settings.modes.tproxy!.env!.exclude_gid = v))"
@@ -334,7 +323,7 @@ async function save() {
           <md-radio name="bypass-redir" :checked="bypassRedir === 'gid'"></md-radio>
           <span class="radio-text">
             <b>GID 放行</b>
-            <span>meta skgid · 放行 sing-box 用户组流量</span>
+            <span>meta skgid · 放行代理服务用户组流量</span>
           </span>
         </label>
         <label class="radio-card" :class="{ selected: bypassRedir === 'mark' }" @click="bypassRedir = 'mark'" v-ripple>
@@ -348,7 +337,7 @@ async function save() {
       <div class="row" style="margin-top: 14px">
         <div class="field">
           <md-outlined-text-field
-            label="排除 GID（sing-box 用户组）"
+            label="排除 GID（代理服务用户组）"
             type="number"
             :value="settings.modes['redir-tproxy']!.env!.exclude_gid"
             @input="onNum($event, (v) => (settings.modes['redir-tproxy']!.env!.exclude_gid = v))"
@@ -378,40 +367,6 @@ async function save() {
           ></md-outlined-text-field>
         </div>
       </div>
-    </div>
-
-    <!-- EP（endpoint 模式） -->
-    <div v-show="tab === 'ep'" class="card">
-      <div class="section-title"><Icon name="layers" :size="15" /> EP 端点模块（endpoints）</div>
-      <md-outlined-text-field
-        label="端点模块 endpoints（JSON 数组）"
-        type="textarea"
-        rows="10"
-        class="code"
-        placeholder='[ { "type": "wireguard", "tag": "wg-ep", "system_interface": false, "interface_name": "wg0", "private_key": "...", "address": ["10.0.0.2/32"], "peers": [ { "server": "...", "server_port": 51820, "public_key": "...", "allowed_ips": ["0.0.0.0/0"] } ] } ]'
-        :value="epEndpoints"
-        @input="onInput($event, (v) => (epEndpoints = v))"
-      ></md-outlined-text-field>
-    </div>
-
-    <!-- EBPF（ebpf 入站） -->
-    <div v-show="tab === 'ebpf'" class="card">
-      <div class="section-title"><Icon name="cpu" :size="15" /> EBPF 入站模块</div>
-      <md-outlined-text-field
-        label="预定义入站 preset（JSON 数组）"
-        type="textarea"
-        rows="10"
-        class="code"
-        placeholder='[ { "type": "ebpf", "tag": "ebpf-in" } ]'
-        :value="ebpfPreset"
-        @input="onInput($event, (v) => (ebpfPreset = v))"
-      ></md-outlined-text-field>
-    </div>
-
-    <!-- SERVER -->
-    <div v-show="tab === 'server'" class="card">
-      <div class="section-title"><Icon name="server" :size="15" /> SERVER 模式（用户自管）</div>
-      <p class="sub">在「配置管理」页直接编辑保存 config_server.json。</p>
     </div>
 
     <!-- 保存栏（玻璃浮层） -->

@@ -1,0 +1,102 @@
+{
+  "log": {
+    "level": "info",
+    "timestamp": true
+  },
+  "dns": {
+    "servers": [
+      {
+        "tag": "remote",
+        "type": "https",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "path": "/dns-query",
+        "detour": "proxy"
+      },
+      {
+        "tag": "local",
+        "type": "udp",
+        "server": "223.5.5.5",
+        "server_port": 53,
+        "detour": "direct"
+      }
+    ],
+    "final": "remote"
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "0.0.0.0",
+      "listen_port": 20080
+    },
+    {
+      "type": "tproxy",
+      "tag": "tproxy-in",
+      "listen": "0.0.0.0",
+      "listen_port": 22026,
+      "tcp_fast_open": true
+    }
+  ],
+  "outbounds": [
+    {
+      "type": "direct",
+      "tag": "direct"
+    },
+    {
+      "type": "selector",
+      "tag": "proxy",
+      "outbounds": [
+        "\u81ea\u52a8\u9009\u62e9",
+        "\u793a\u4f8b\u8282\u70b9-\u9999\u6e2f",
+        "\u793a\u4f8b\u8282\u70b9-\u65e5\u672c"
+      ],
+      "default": "\u81ea\u52a8\u9009\u62e9"
+    },
+    {
+      "type": "urltest",
+      "tag": "\u81ea\u52a8\u9009\u62e9",
+      "url": "http://www.gstatic.com/generate_204",
+      "interval": "5m",
+      "outbounds": [
+        "\u793a\u4f8b\u8282\u70b9-\u9999\u6e2f",
+        "\u793a\u4f8b\u8282\u70b9-\u65e5\u672c"
+      ]
+    },
+    {
+      "type": "vmess",
+      "tag": "\u793a\u4f8b\u8282\u70b9-\u9999\u6e2f",
+      "server": "198.51.100.10",
+      "server_port": 443,
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "security": "auto",
+      "alter_id": 0
+    },
+    {
+      "type": "vmess",
+      "tag": "\u793a\u4f8b\u8282\u70b9-\u65e5\u672c",
+      "server": "198.51.100.11",
+      "server_port": 443,
+      "uuid": "00000000-0000-0000-0000-000000000000",
+      "security": "auto",
+      "alter_id": 0
+    }
+  ],
+  "route": {
+    "default_domain_resolver": "local",
+    "rules": [
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      },
+      {
+        "outbound": "direct"
+      }
+    ]
+  },
+  "experimental": {
+    "cache_file": {
+      "enabled": true
+    }
+  }
+}

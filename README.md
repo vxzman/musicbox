@@ -81,7 +81,7 @@ cd .. && go build -ldflags="-s -w \
 产物为根目录下单一二进制 `musicbox`，可用 `./musicbox info` 查看版本与内嵌前端状态。
 
 > `web/dist/` 中保留了占位 `index.html`，未构建前端时 `go build` 也能通过（二进制将显示"前端尚未构建"提示页）。
-> 目标机装有 Go 时也可直接 `sudo ./deploy/deploy.sh install`，它会自动完成上述构建注入。
+> 目标机装有 Go 时也可直接 `sudo ./deploy.sh --install`，它会自动完成上述构建与部署。
 
 ## 部署到服务器（免编译，上传哪些文件）
 

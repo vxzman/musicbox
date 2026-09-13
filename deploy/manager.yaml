@@ -1,0 +1,103 @@
+# MusicBox 系统配置文件（默认部署于 /opt/musicbox/manager.yaml）
+dirs:
+  config_dir: /etc/sing-box
+  data_dir: /var/lib/sing-box
+
+daemon:
+  web_addr: "0.0.0.0:8082"
+  cli_socket: /run/musicbox/musicbox.sock
+  apply_delay_ms: 1000
+  reconcile_interval: 5s
+
+modes:
+  tun:
+    label: TUN
+    unit: sing-box@tun
+    config: config_tun.json
+    routing:
+      rule_index: 9000
+      table_index: 2022
+    cleanup:
+      nft_tables:
+        - inet sing-box
+    preset: |
+      [
+        {
+          "type": "tun",
+          "tag": "tun-in",
+          "interface_name": "tun0",
+          "mtu": 1500,
+          "address": [
+            "172.19.0.1/30",
+            "2001:470:f9da:fdfa::1/64"
+          ],
+          "auto_route": true,
+          "auto_redirect": true,
+          "stack": "system",
+          "endpoint_independent_nat": true
+        }
+      ]
+  tproxy:
+    label: TPROXY
+    unit: sing-box@tproxy
+    config: config_tproxy.json
+    env:
+      tproxy_port: 22026
+      exclude_gid: 988
+      routing_mark: 6666
+      fwmark: 1
+      table_id: 100
+      nftables_table: sing-box_tproxy4
+    preset: |
+      [
+        {
+          "type": "tproxy",
+          "tag": "tproxy-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22026,
+          "tcp_fast_open": true
+        }
+      ]
+  redir-tproxy:
+    label: REDIR-TPROXY
+    unit: sing-box@redir-tproxy
+    config: config_redir-tproxy.json
+    env:
+      tproxy_port: 22026
+      redirect_port: 22025
+      exclude_gid: 988
+      routing_mark: 6666
+      fwmark: 1
+      table_id: 100
+      nftables_table: sing-box_redir_tproxy4
+    preset: |
+      [
+        {
+          "type": "redirect",
+          "tag": "rdr-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22025,
+          "tcp_fast_open": true
+        },
+        {
+          "type": "tproxy",
+          "tag": "tproxy-in",
+          "listen": "0.0.0.0",
+          "listen_port": 22026,
+          "tcp_fast_open": true
+        }
+      ]
+  socks:
+    label: SOCKS
+    unit: sing-box@socks
+    config: config_socks.json
+    preset: |
+      [
+        {
+          "type": "mixed",
+          "tag": "mixed-in",
+          "listen": "0.0.0.0",
+          "listen_port": 20080,
+          "tcp_fast_open": true
+        }
+      ]

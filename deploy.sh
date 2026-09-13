@@ -164,28 +164,27 @@ do_pack() {
 
     log_info "开始为项目准备打包..."
 
-    # 1. 查找或构建 musicbox 二进制
+    # 1. 查找或构建 musicbox 二进制（严格存放于 build/ 目录）
     local musicbox_bin=""
     if [ -f "$ROOT_DIR/build/musicbox" ] && [ -x "$ROOT_DIR/build/musicbox" ]; then
         musicbox_bin="$ROOT_DIR/build/musicbox"
-    elif [ -f "$ROOT_DIR/musicbox" ] && [ -x "$ROOT_DIR/musicbox" ]; then
-        musicbox_bin="$ROOT_DIR/musicbox"
     fi
 
     if [ -z "$musicbox_bin" ]; then
-        log_info "未检测到已编译好的 musicbox 二进制，尝试自动构建..."
+        log_info "未检测到 build/musicbox 二进制，尝试自动构建..."
         if command -v go >/dev/null 2>&1; then
+            mkdir -p "$ROOT_DIR/build"
             if [ -x "$ROOT_DIR/build.sh" ]; then
                 "$ROOT_DIR/build.sh" binary
                 musicbox_bin="$ROOT_DIR/build/musicbox"
             else
                 local ver
                 ver="$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || echo dev)"
-                (cd "$ROOT_DIR" && go build -ldflags="-s -w -X main.version=$ver" -o musicbox .)
-                musicbox_bin="$ROOT_DIR/musicbox"
+                (cd "$ROOT_DIR" && go build -ldflags="-s -w -X main.version=$ver" -o "$ROOT_DIR/build/musicbox" .)
+                musicbox_bin="$ROOT_DIR/build/musicbox"
             fi
         else
-            die "未找到已编译的 musicbox 且当前环境无 Go 编译器，无法打包！请先编译出 musicbox 二进制。"
+            die "未找到 build/musicbox 且当前环境无 Go 编译器，无法打包！请先编译出 musicbox 二进制。"
         fi
     fi
 
@@ -198,19 +197,20 @@ do_pack() {
         version="$(git -C "$ROOT_DIR" describe --tags --exact-match 2>/dev/null || true)"
     fi
 
-    # 默认输出包名
+    # 默认输出包名（严格统一存放于 build/ 目录，不污染项目根目录）
     local out_file="$target_out"
     if [ -z "$out_file" ]; then
+        mkdir -p "$ROOT_DIR/build"
         if [ -n "$version" ]; then
-            out_file="$ROOT_DIR/musicbox-deploy-${version}-${timestamp}.tar.gz"
+            out_file="$ROOT_DIR/build/musicbox-deploy-${version}-${timestamp}.tar.gz"
         else
-            out_file="$ROOT_DIR/musicbox-deploy-${timestamp}.tar.gz"
+            out_file="$ROOT_DIR/build/musicbox-deploy-${timestamp}.tar.gz"
         fi
     fi
 
     # 2. 查找 sing-box 内核二进制
     local singbox_bin=""
-    for candidate in "$ROOT_DIR/build/sing-box" "$ROOT_DIR/bin/sing-box" "$ROOT_DIR/sing-box"; do
+    for candidate in "$ROOT_DIR/build/sing-box" "$ROOT_DIR/bin/sing-box"; do
         if [ -f "$candidate" ] && [ -x "$candidate" ]; then
             singbox_bin="$candidate"
             break
@@ -225,7 +225,9 @@ do_pack() {
     # 3. 查找服务单元与默认配置
     local mb_service="$ROOT_DIR/deploy/musicbox.service"
     local sb_service="$ROOT_DIR/deploy/sing-box@.service"
+    local manager_yaml="$ROOT_DIR/deploy/manager.yaml"
     local config_generic="$ROOT_DIR/deploy/etc-sing-box/config_generic.json"
+    local etc_singbox_dir="$ROOT_DIR/deploy/etc-sing-box"
     local kernel_config="$ROOT_DIR/deploy/kernel-proxy.config"
 
     [ -f "$mb_service" ] || die "缺少必要文件: $mb_service"
@@ -254,7 +256,7 @@ do_pack() {
         log_warn "    在目标服务器部署时需自行提供 /usr/local/bin/sing-box。"
     fi
 
-    # 复制服务单元与模板
+    # 复制服务单元与设置
     cp "$mb_service" "$stage_dir/musicbox.service"
     chmod 0644 "$stage_dir/musicbox.service"
     log_info "  + 单元:   musicbox.service"
@@ -263,9 +265,22 @@ do_pack() {
     chmod 0644 "$stage_dir/sing-box@.service"
     log_info "  + 单元:   sing-box@.service"
 
+    if [ -f "$manager_yaml" ]; then
+        cp "$manager_yaml" "$stage_dir/manager.yaml"
+        chmod 0644 "$stage_dir/manager.yaml"
+        log_info "  + 设置:   manager.yaml"
+    fi
+
     cp "$config_generic" "$stage_dir/config_generic.json"
     chmod 0644 "$stage_dir/config_generic.json"
     log_info "  + 配置:   config_generic.json"
+
+    if [ -d "$etc_singbox_dir" ]; then
+        mkdir -p "$stage_dir/etc-sing-box"
+        cp -r "$etc_singbox_dir"/* "$stage_dir/etc-sing-box/"
+        chmod -R 0644 "$stage_dir/etc-sing-box"/*
+        log_info "  + 模式配置目录: etc-sing-box/"
+    fi
 
     if [ -f "$kernel_config" ]; then
         cp "$kernel_config" "$stage_dir/kernel-proxy.config"
@@ -273,7 +288,7 @@ do_pack() {
     fi
 
     # 复制本脚本自身（用于解压后一键部署与卸载）
-    cp "$SCRIPT_DIR/deploy.sh" "$stage_dir/deploy.sh"
+    cp "$ROOT_DIR/deploy.sh" "$stage_dir/deploy.sh"
     chmod 0755 "$stage_dir/deploy.sh"
     log_info "  + 脚本:   deploy.sh"
 
@@ -389,6 +404,14 @@ do_install() {
     done
     [ -n "$cfg_generic_src" ] || die "未找到 config_generic.json 模板配置文件！"
 
+    local manager_yaml_src=""
+    for f in "$work_dir/manager.yaml" "$work_dir/deploy/manager.yaml" "$ROOT_DIR/deploy/manager.yaml"; do
+        if [ -f "$f" ]; then
+            manager_yaml_src="$f"
+            break
+        fi
+    done
+
     # 开始安装流程
     log_info "=================================================="
     log_info "开始在当前系统部署 MusicBox"
@@ -481,6 +504,44 @@ do_install() {
         log_success "已初始化模板配置: $ETC_SINGBOX_DIR/config_generic.json"
     else
         log_info "检测到已有 $ETC_SINGBOX_DIR/config_generic.json，保留现有配置不覆盖"
+    fi
+
+    # 复制各模式初始参考配置（如不存在）
+    for cfg_dir in "$work_dir/etc-sing-box" "$work_dir/deploy/etc-sing-box" "$ROOT_DIR/deploy/etc-sing-box"; do
+        if [ -d "$cfg_dir" ]; then
+            for mode_cfg in "$cfg_dir"/config_*.json; do
+                if [ -f "$mode_cfg" ]; then
+                    local fname
+                    fname="$(basename "$mode_cfg")"
+                    if [ ! -f "$ETC_SINGBOX_DIR/$fname" ]; then
+                        if [ -z "$DESTDIR" ]; then
+                            install -m 0644 -o root -g root "$mode_cfg" "$ETC_SINGBOX_DIR/$fname"
+                        else
+                            install -m 0644 "$mode_cfg" "$ETC_SINGBOX_DIR/$fname"
+                        fi
+                        log_info "  + 初始化模式配置: $fname"
+                    fi
+                fi
+            done
+            break
+        fi
+    done
+
+    # 初始化 manager.yaml（若不存在）
+    if [ -n "$manager_yaml_src" ] && [ ! -f "$OPT_MUSICBOX_DIR/manager.yaml" ]; then
+        if [ -z "$DESTDIR" ]; then
+            install -m 0644 -o root -g root "$manager_yaml_src" "$OPT_MUSICBOX_DIR/manager.yaml"
+            if id sing-box >/dev/null 2>&1; then
+                local sbgid
+                sbgid="$(id -g sing-box)"
+                sed -i "s/exclude_gid: [0-9]\+/exclude_gid: $sbgid/g" "$OPT_MUSICBOX_DIR/manager.yaml"
+            fi
+        else
+            install -m 0644 "$manager_yaml_src" "$OPT_MUSICBOX_DIR/manager.yaml"
+        fi
+        log_success "已初始化系统设置: $OPT_MUSICBOX_DIR/manager.yaml"
+    elif [ -f "$OPT_MUSICBOX_DIR/manager.yaml" ]; then
+        log_info "已有系统设置 $OPT_MUSICBOX_DIR/manager.yaml，保留现有配置"
     fi
 
     # 5. 安装 systemd 单元

@@ -1,0 +1,25 @@
+services:
+  musicbox-kata:
+    image: localhost/musicbox:latest
+    container_name: musicbox-kata
+    runtime: kata-qemu
+    restart: unless-stopped
+    privileged: true
+    # 端口映射：8082 为 Web 面板，20080 为 SOCKS5/HTTP 混合代理端口
+    ports:
+      - "8082:8082"
+      - "20080:20080"
+    volumes:
+      - musicbox-kata-config:/etc/sing-box
+      - musicbox-kata-data:/var/lib/sing-box
+      - musicbox-kata-manager:/opt/musicbox
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+volumes:
+  musicbox-kata-config:
+    driver: local
+  musicbox-kata-data:
+    driver: local
+  musicbox-kata-manager:
+    driver: local

@@ -243,6 +243,69 @@ docker run -d \
 
 容器启动后，即可在浏览器访问 `http://<服务器IP>:8082`。
 
+### 3. Kata Containers 强隔离部署（硬件级微虚机沙箱）
+
+在多租户服务器、公共云计算实例或对安全性要求极高的生产环境中，代理内核（处理复杂外网流量、解密 TLS 等）以及网络特权操作往往具有潜在的安全暴露面。
+
+**传统 runc 容器 vs Kata Containers 隔离对比**：
+
+* **传统 runc 容器**：容器与宿主机共享同一个 Linux 内核。透明代理所需的 `--privileged` 特权与 `CAP_NET_ADMIN` 使得容器进程能够直接触碰宿主机内核底层；一旦代理内核或 netfilter 驱动存在漏洞，存在攻击者逃逸至宿主机的风险。
+* **Kata Containers（微虚机架构）**：每个容器均运行在独立的轻量级虚拟机（MicroVM，基于 QEMU / Cloud Hypervisor）之中，拥有**完全专享且独立的 Guest Linux 内核**。
+  * **特权安全封锁**：容器内赋予的 `--privileged` 仅作用于该微虚机内部的 Guest 内核，无法突破硬件虚拟化层侵入物理宿主机；
+  * **网络零污染**：在微虚机中建立的全部 `nftables` 规则与 `tun0` 路由表均在微虚机内部闭环，物理宿主机的全局网络与防火墙保持绝对纯净。
+
+#### 前置环境准备
+确保宿主机 CPU 支持硬件虚拟化（`egrep -c '(vmx|svm)' /proc/cpuinfo`），并在 Docker 中配置了 Kata 运行时（如 `/etc/docker/daemon.json`）：
+```json
+{
+  "runtimes": {
+    "kata-qemu": {
+      "path": "/usr/bin/kata-runtime"
+    },
+    "kata-clh": {
+      "path": "/usr/bin/kata-runtime"
+    }
+  }
+}
+```
+
+#### 部署方式一：使用 Docker Compose（微虚机独立端口映射）
+项目提供开箱即用的 [docker-compose.kata.yml](docker-compose.kata.yml)：
+
+```bash
+docker compose -f docker-compose.kata.yml up -d
+docker compose -f docker-compose.kata.yml logs -f
+```
+
+配置将 Web 面板端口 `8082` 与 Mixed 代理端口 `20080` 暴露，所有内核操作在 Kata 独立的 Guest Linux 内核中安全沙箱化运行。
+
+#### 部署方式二：独立旁路网关模式（Macvlan / 局域网物理直通，强烈推荐）
+通过 Docker Macvlan 驱动将物理局域网网段直接接入 Kata 容器微虚机，让其作为一个独立的物理“网络硬件设备”运行：
+
+```bash
+# 1. 创建直通局域网的 Macvlan 网络（以 eth0 为父网卡为例）
+docker network create -d macvlan \
+  --subnet=192.168.1.0/24 \
+  --gateway=192.168.1.1 \
+  -o parent=eth0 kata-lan
+
+# 2. 启动 Kata 独立微虚机容器，并赋予专属内网 IP（如 192.168.1.88）
+docker run -d \
+  --runtime kata-qemu \
+  --name musicbox-kata \
+  --restart unless-stopped \
+  --network kata-lan \
+  --ip 192.168.1.88 \
+  --privileged \
+  --device /dev/net/tun:/dev/net/tun \
+  -v /opt/musicbox-kata/config:/etc/sing-box \
+  -v /opt/musicbox-kata/data:/var/lib/sing-box \
+  -v /opt/musicbox-kata/manager:/opt/musicbox \
+  localhost/musicbox:latest
+```
+
+* **使用效果**：局域网中其他设备或客户端只需将**默认网关**与 **DNS** 设定为 `192.168.1.88`，即可透明享受高速科学代理；即使该代理实例遭遇高压甚至未知攻击，物理宿主机与物理局域网其他服务依然安然无恙。
+
 ---
 
 ## 🔒 安全与反向代理
@@ -299,6 +362,7 @@ server {
 ├── deploy.sh                   # 一键打包 (--pack)、部署 (--install) 与卸载 (--remove) 脚本
 ├── google-md3-glass-design.md  # 前端 Google MD3 + Glass 视觉规范
 ├── docker-compose.yml          # 容器编排部署配置
+├── docker-compose.kata.yml     # Kata Containers 微虚机强隔离部署配置
 ├── Dockerfile                  # Rocky Linux 9 容器构建清单
 ├── deploy/                     # Linux 标准系统目录映射（用于测试、模拟与一键打包）
 │   ├── etc/

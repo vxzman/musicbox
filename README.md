@@ -89,12 +89,13 @@ cd .. && go build -ldflags="-s -w \
 
 **首次部署上传 4 个文件**：
 
-| 文件 | 目标位置 |
+| 文件（deploy/ 映射目录） | 目标位置 |
 |---|---|
-| `musicbox`（已编译二进制，前端已内嵌） | `/usr/local/bin/musicbox` |
-| `deploy/sing-box@.service` | `/etc/systemd/system/` |
-| `deploy/musicbox.service` | `/etc/systemd/system/` |
-| `deploy/etc-sing-box/config_generic.json`（模板配置） | `/etc/sing-box/` |
+| `deploy/usr/local/bin/musicbox`（已编译二进制，前端已内嵌） | `/usr/local/bin/musicbox` |
+| `deploy/etc/systemd/system/sing-box@.service` | `/etc/systemd/system/sing-box@.service` |
+| `deploy/etc/systemd/system/musicbox.service` | `/etc/systemd/system/musicbox.service` |
+| `deploy/etc/sing-box/config_generic.json`（模板配置） | `/etc/sing-box/config_generic.json` |
+| `deploy/opt/musicbox/manager.yaml`（系统设置） | `/opt/musicbox/manager.yaml` |
 
 ```bash
 # 1. 本机一键打包（自动附加时间戳，产物为 musicbox-deploy-<version>-<timestamp>.tar.gz）

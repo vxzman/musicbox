@@ -3,6 +3,8 @@
 /singbox-manager
 /build/
 *.tar.gz
+deploy/usr/local/bin/*
+!deploy/usr/local/bin/.gitkeep
 
 # ─── 前端 ───────────────────────────────────
 web/node_modules/

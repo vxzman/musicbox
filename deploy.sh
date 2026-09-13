@@ -208,7 +208,13 @@ do_pack() {
         fi
     fi
 
-    # 2. 查找 sing-box 内核二进制
+    # 2. 复制编译好的二进制到 deploy/usr/local/bin
+    mkdir -p "$ROOT_DIR/deploy/usr/local/bin"
+    cp "$musicbox_bin" "$ROOT_DIR/deploy/usr/local/bin/musicbox"
+    chmod 0755 "$ROOT_DIR/deploy/usr/local/bin/musicbox"
+    log_info "  + 复制二进制: musicbox ($(du -h "$musicbox_bin" | awk '{print $1}')) -> deploy/usr/local/bin/"
+
+    # 查找并复制 sing-box 内核（若存在）
     local singbox_bin=""
     for candidate in "$ROOT_DIR/build/sing-box" "$ROOT_DIR/bin/sing-box"; do
         if [ -f "$candidate" ] && [ -x "$candidate" ]; then
@@ -216,90 +222,32 @@ do_pack() {
             break
         fi
     done
-    if [ -z "$singbox_bin" ]; then
-        if command -v sing-box >/dev/null 2>&1; then
-            singbox_bin="$(command -v sing-box)"
-        fi
+    if [ -z "$singbox_bin" ] && command -v sing-box >/dev/null 2>&1; then
+        singbox_bin="$(command -v sing-box)"
     fi
 
-    # 3. 查找服务单元与默认配置
-    local mb_service="$ROOT_DIR/deploy/musicbox.service"
-    local sb_service="$ROOT_DIR/deploy/sing-box@.service"
-    local manager_yaml="$ROOT_DIR/deploy/manager.yaml"
-    local config_generic="$ROOT_DIR/deploy/etc-sing-box/config_generic.json"
-    local etc_singbox_dir="$ROOT_DIR/deploy/etc-sing-box"
-    local kernel_config="$ROOT_DIR/deploy/kernel-proxy.config"
-
-    [ -f "$mb_service" ] || die "缺少必要文件: $mb_service"
-    [ -f "$sb_service" ] || die "缺少必要文件: $sb_service"
-    [ -f "$config_generic" ] || die "缺少必要文件: $config_generic"
-
-    # 4. 创建暂存目录组装
-    local stage_dir
-    stage_dir="$(mktemp -d)"
-    trap 'rm -rf "${stage_dir:-}"' EXIT
-
-    log_info "组装打包文件到临时目录..."
-
-    # 复制 musicbox 二进制
-    cp "$musicbox_bin" "$stage_dir/musicbox"
-    chmod 0755 "$stage_dir/musicbox"
-    log_info "  + 二进制: musicbox ($(du -h "$musicbox_bin" | awk '{print $1}'))"
-
-    # 复制 sing-box 二进制（若存在）
     if [ -n "$singbox_bin" ]; then
-        cp "$singbox_bin" "$stage_dir/sing-box"
-        chmod 0755 "$stage_dir/sing-box"
-        log_info "  + 内核:   sing-box ($(du -h "$singbox_bin" | awk '{print $1}'))"
+        cp "$singbox_bin" "$ROOT_DIR/deploy/usr/local/bin/sing-box"
+        chmod 0755 "$ROOT_DIR/deploy/usr/local/bin/sing-box"
+        log_info "  + 复制内核:   sing-box ($(du -h "$singbox_bin" | awk '{print $1}')) -> deploy/usr/local/bin/"
     else
-        log_warn "  ! 未在 build/ 或系统找到 sing-box 内核二进制，打包中将不包含 sing-box。"
+        log_warn "  ! 未找到 sing-box 内核二进制，打包中将不包含 sing-box。"
         log_warn "    在目标服务器部署时需自行提供 /usr/local/bin/sing-box。"
     fi
 
-    # 复制服务单元与设置
-    cp "$mb_service" "$stage_dir/musicbox.service"
-    chmod 0644 "$stage_dir/musicbox.service"
-    log_info "  + 单元:   musicbox.service"
+    # 3. 校验映射目录结构完整性
+    [ -f "$ROOT_DIR/deploy/etc/systemd/system/musicbox.service" ] || die "缺少必要文件: deploy/etc/systemd/system/musicbox.service"
+    [ -f "$ROOT_DIR/deploy/etc/systemd/system/sing-box@.service" ] || die "缺少必要文件: deploy/etc/systemd/system/sing-box@.service"
+    [ -f "$ROOT_DIR/deploy/etc/sing-box/config_generic.json" ] || die "缺少必要文件: deploy/etc/sing-box/config_generic.json"
+    [ -f "$ROOT_DIR/deploy/opt/musicbox/manager.yaml" ] || die "缺少必要文件: deploy/opt/musicbox/manager.yaml"
 
-    cp "$sb_service" "$stage_dir/sing-box@.service"
-    chmod 0644 "$stage_dir/sing-box@.service"
-    log_info "  + 单元:   sing-box@.service"
-
-    if [ -f "$manager_yaml" ]; then
-        cp "$manager_yaml" "$stage_dir/manager.yaml"
-        chmod 0644 "$stage_dir/manager.yaml"
-        log_info "  + 设置:   manager.yaml"
-    fi
-
-    cp "$config_generic" "$stage_dir/config_generic.json"
-    chmod 0644 "$stage_dir/config_generic.json"
-    log_info "  + 配置:   config_generic.json"
-
-    if [ -d "$etc_singbox_dir" ]; then
-        mkdir -p "$stage_dir/etc-sing-box"
-        cp -r "$etc_singbox_dir"/* "$stage_dir/etc-sing-box/"
-        chmod -R 0644 "$stage_dir/etc-sing-box"/*
-        log_info "  + 模式配置目录: etc-sing-box/"
-    fi
-
-    if [ -f "$kernel_config" ]; then
-        cp "$kernel_config" "$stage_dir/kernel-proxy.config"
-        log_info "  + 参考:   kernel-proxy.config"
-    fi
-
-    # 复制本脚本自身（用于解压后一键部署与卸载）
-    cp "$ROOT_DIR/deploy.sh" "$stage_dir/deploy.sh"
-    chmod 0755 "$stage_dir/deploy.sh"
-    log_info "  + 脚本:   deploy.sh"
-
-    # 5. 打包归档
+    # 4. 直接打包 Linux 映射目录与部署脚本
+    log_info "打包 Linux 映射目录 (etc, opt, usr, var) 与部署脚本..."
     mkdir -p "$(dirname "$out_file")"
-    tar -czf "$out_file" -C "$stage_dir" .
+    tar -czf "$out_file" -C "$ROOT_DIR" deploy.sh -C "$ROOT_DIR/deploy" etc opt usr var
 
     local file_size
     file_size="$(du -h "$out_file" | awk '{print $1}')"
-    rm -rf "$stage_dir"
-    trap - EXIT
 
     log_success "打包完成！产物路径: $out_file (大小: $file_size)"
     echo ""
@@ -359,9 +307,9 @@ do_install() {
         trap 'rm -rf "${work_dir:-}"' EXIT
     fi
 
-    # 定位各物料文件
+    # 定位各物料文件（优先匹配 Linux 标准映射目录）
     local musicbox_src=""
-    for f in "$work_dir/musicbox" "$work_dir/build/musicbox" "$ROOT_DIR/musicbox" "$ROOT_DIR/build/musicbox"; do
+    for f in "$work_dir/usr/local/bin/musicbox" "$work_dir/musicbox" "$ROOT_DIR/deploy/usr/local/bin/musicbox" "$ROOT_DIR/build/musicbox"; do
         if [ -f "$f" ] && [ -x "$f" ]; then
             musicbox_src="$f"
             break
@@ -370,7 +318,7 @@ do_install() {
     [ -n "$musicbox_src" ] || die "未找到 musicbox 二进制文件，无法进行安装！"
 
     local singbox_src=""
-    for f in "$work_dir/sing-box" "$work_dir/build/sing-box" "$work_dir/bin/sing-box" "$ROOT_DIR/build/sing-box" "$ROOT_DIR/bin/sing-box"; do
+    for f in "$work_dir/usr/local/bin/sing-box" "$work_dir/sing-box" "$ROOT_DIR/deploy/usr/local/bin/sing-box" "$ROOT_DIR/build/sing-box"; do
         if [ -f "$f" ] && [ -x "$f" ]; then
             singbox_src="$f"
             break
@@ -378,7 +326,7 @@ do_install() {
     done
 
     local mb_service_src=""
-    for f in "$work_dir/musicbox.service" "$work_dir/deploy/musicbox.service" "$ROOT_DIR/deploy/musicbox.service"; do
+    for f in "$work_dir/etc/systemd/system/musicbox.service" "$work_dir/musicbox.service" "$ROOT_DIR/deploy/etc/systemd/system/musicbox.service"; do
         if [ -f "$f" ]; then
             mb_service_src="$f"
             break
@@ -387,7 +335,7 @@ do_install() {
     [ -n "$mb_service_src" ] || die "未找到 musicbox.service 服务单元文件！"
 
     local sb_service_src=""
-    for f in "$work_dir/sing-box@.service" "$work_dir/deploy/sing-box@.service" "$ROOT_DIR/deploy/sing-box@.service"; do
+    for f in "$work_dir/etc/systemd/system/sing-box@.service" "$work_dir/sing-box@.service" "$ROOT_DIR/deploy/etc/systemd/system/sing-box@.service"; do
         if [ -f "$f" ]; then
             sb_service_src="$f"
             break
@@ -396,7 +344,7 @@ do_install() {
     [ -n "$sb_service_src" ] || die "未找到 sing-box@.service 服务单元文件！"
 
     local cfg_generic_src=""
-    for f in "$work_dir/config_generic.json" "$work_dir/deploy/etc-sing-box/config_generic.json" "$ROOT_DIR/deploy/etc-sing-box/config_generic.json"; do
+    for f in "$work_dir/etc/sing-box/config_generic.json" "$work_dir/config_generic.json" "$ROOT_DIR/deploy/etc/sing-box/config_generic.json"; do
         if [ -f "$f" ]; then
             cfg_generic_src="$f"
             break
@@ -405,7 +353,7 @@ do_install() {
     [ -n "$cfg_generic_src" ] || die "未找到 config_generic.json 模板配置文件！"
 
     local manager_yaml_src=""
-    for f in "$work_dir/manager.yaml" "$work_dir/deploy/manager.yaml" "$ROOT_DIR/deploy/manager.yaml"; do
+    for f in "$work_dir/opt/musicbox/manager.yaml" "$work_dir/manager.yaml" "$ROOT_DIR/deploy/opt/musicbox/manager.yaml"; do
         if [ -f "$f" ]; then
             manager_yaml_src="$f"
             break
@@ -507,7 +455,7 @@ do_install() {
     fi
 
     # 复制各模式初始参考配置（如不存在）
-    for cfg_dir in "$work_dir/etc-sing-box" "$work_dir/deploy/etc-sing-box" "$ROOT_DIR/deploy/etc-sing-box"; do
+    for cfg_dir in "$work_dir/etc/sing-box" "$work_dir/deploy/etc/sing-box" "$ROOT_DIR/deploy/etc/sing-box"; do
         if [ -d "$cfg_dir" ]; then
             for mode_cfg in "$cfg_dir"/config_*.json; do
                 if [ -f "$mode_cfg" ]; then

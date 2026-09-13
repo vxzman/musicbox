@@ -1,0 +1,17 @@
+[Unit]
+Description=Transparent Proxy (%i)
+After=network-online.target sing-box@%p.service
+BindsTo=sing-box@%p.service
+Requires=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+
+Environment=PROXYCORE=%i
+ExecStart=/usr/local/libexec/tproxy.sh start
+ExecStop=/usr/local/libexec/tproxy.sh stop
+
+[Install]
+WantedBy=multi-user.target
+

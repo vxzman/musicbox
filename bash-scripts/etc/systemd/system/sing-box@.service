@@ -1,0 +1,19 @@
+[Unit]
+Description=Sing-Box Daemon
+Documentation=https://sing-box.sagernet.org
+After=network.target nss-lookup.target network-online.target
+
+[Service]
+Type=simple
+User=sing-box
+Group=sing-box
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW CAP_NET_BIND_SERVICE
+ExecStart=/usr/local/bin/sing-box run -D /var/lib/sing-box -c /etc/sing-box/config_%i.json
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+LimitNOFILE=infinity
+
+[Install]
+WantedBy=multi-user.target

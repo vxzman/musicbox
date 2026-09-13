@@ -1,230 +1,233 @@
 # MusicBox
 
-**Linux 服务器上代理内核的透明代理模式编排与切换器。**
+<p align="center">
+  <b>专为 Linux 服务器设计的代理内核透明代理模式编排器与 Web 控制台</b>
+</p>
 
-在 Linux 服务器直接运行 sing-box 等代理内核（无面板、无 GUI）时，用它一键切换 tun / tproxy / redir-tproxy / socks 等透明代理模式：配套的 nftables / ip 路由规则由守护进程自动编排，并与后台 systemd 实例**同生共死**（启动即套规则、停止即清理）。
+<p align="center">
+  <a href="#-本项目特色裸核代理透明编排">项目特色</a> •
+  <a href="#-前端设计美学google-md3--glass">设计美学</a> •
+  <a href="#-从源码构建测试预览与编译">构建与预览</a> •
+  <a href="#-普通二进制部署宿主机原生环境">二进制部署</a> •
+  <a href="#-容器化部署docker--compose">容器部署</a> •
+  <a href="#-安全与反向代理">反代与安全</a>
+</p>
 
-实现为**单一 Go 二进制**（守护进程 + CLI），Vue 3 前端内嵌，部署只需分发一个文件。
+---
 
-## ✨ 界面
+## 🌟 本项目特色：裸核代理透明编排
 
-前端遵循 [Google MD3 + Glass 设计美学](google-md3-glass-design.md)：紫罗兰 `#6750A4` 种子色、三颗光斑氛围层、三层玻璃体系（导航胶囊 / 玻璃卡片 / 涟漪按钮），"Material You — but make it breathe."
+在 Linux 服务器或软路由上直接运行 `sing-box` 等纯代理内核（无桌面 GUI、无现成透明代理编排面板）时，传统运维往往面临三大痛点：
+1. **策略路由与防火墙规则繁琐易错**：手动编写复杂的 `nftables` 表、`ip rule` 优先级及路由表，极易造成网络死锁；
+2. **进程与规则生命周期脱节**：内核意外退出或停止后规则仍然残留，导致整机断网；
+3. **流量回环难以防范**：本机代理出站流量若未做精细绕行，会再度被拦截送入代理端口，瞬间打爆系统。
 
-- **运行状态**：模式摘要 Hero、统计条、模式启停列表（单元状态 + 规则状态芯片，SSE 秒级刷新）
-- **配置管理**：双栏编辑器，`config_generic.json` 是编辑入口，各模式配置只读预览
-- **系统设置**：分段选项卡，管理 manager.yaml（规则数字 / 环境变量 / 预定义入站）
+**MusicBox 为解决上述痛点而生：**
 
-## 特性
+* **单一二进制，极简交付**：整个项目编译为单一 Go 二进制程序（守护进程 + 命令行 CLI），内嵌现代化 Web 前端，无外部环境依赖。
+* **4 种透明代理模式一键切换**：开箱支持 `tun`、`tproxy`、`redir-tproxy` 和 `socks`，并与宿主机 `systemd` 或容器进程深度集成。
+* **规则与内核“同生共死”**：守护进程实时监听服务生命周期，内核实例启动时自动下发配套 nft/ip 规则，内核停止或异常崩溃时自动清理回收规则，重启时自动 reconcile 兜底，彻底杜绝规则残留。
+* **双重回环避免机制**：原生支持 `meta skgid`（系统专有用户组 GID 绕行，宿主机环境推荐）与 `meta mark` / `routing_mark`（Fwmark 标记绕行，容器环境推荐），二选一可灵活配置。
+* **配置单一事实源**：以 `config_generic.json`（通用节点与路由配置）与 `manager.yaml`（规则端口与参数）为中心，自动校验并原子合并生成各模式配置，全面兼容 sing-box 1.14+ 现代格式。
+* **系统状态实时响应**：宿主机原生通过 D-Bus 监听 systemd 状态，前端通过 SSE（Server-Sent Events）秒级推送，手动执行 `systemctl` 也能即时同步到面板。
 
-- **4 种模式**：tun / tproxy / redir-tproxy / socks；原生环境下若 systemd 上已有 `sing-box@<mode>` 在跑，首页直接显示该模式为运行中
-- **规则生命周期**：启动服务实例 → 延迟套用 nft/ip 规则 → 实例停止即清理（同生共死）；守护重启自动 reconcile 兜底；tun0 消失自动清理残留
-- **回环避免双方式**：`meta skgid`（GID，优先）或 `meta mark`（路由 mark），二选一可配置
-- **统一配置**：`/opt/musicbox/manager.yaml` 是规则数字 / env / 预定义入站的唯一事实源
-- **实时状态**：dbus 订阅 + SSE 推送，面板状态秒级刷新
-- **配置同步**：`config_generic.json` + 各模式预定义入站 → 配置校验后原子写入
+### 四大运行模式对比
 
-## 架构
-
-```
-musicbox                       单一二进制
-├── serve                      守护进程（systemd 或容器进程后端）
-│   ├── 管理 sing-box@<mode> 实例
-│   ├── exec ip/nft 套规则（同生共死编排）
-│   ├── REST + SSE（/api、/api/events）
-│   └── 内嵌 Vue 3 前端（web/dist，go:embed）
-└── <mode> start|stop|status   模式启停与状态查询
-```
-
-| 模式 | 单元 | 配置 | 说明 |
+| 模式 | 运行实例 | 核心机制 | 适用场景与系统要求 |
 |---|---|---|---|
-| tun | sing-box@tun | config_tun.json | tun0，auto_route/auto_redirect，rule 9000 / table 2022 派生清理 |
-| tproxy | sing-box@tproxy | config_tproxy.json | tproxy 22026，fwmark 1 / table 100 / nft sing-box_tproxy4 |
-| redir-tproxy | sing-box@redir-tproxy | config_redir-tproxy.json | redirect 22025 + tproxy 22026，nft sing-box_redir_tproxy4 |
-| socks | sing-box@socks | config_socks.json | mixed 20080 |
+| **TUN** | `sing-box@tun` | 创建虚拟网卡 `tun0`，由内核通过 `auto_route` 自动接管三层流量 | 通用性最高，不依赖特定 iptables/nftables 扩展模块 |
+| **TPROXY** | `sing-box@tproxy` | 基于 `nftables` + `ip rule` 实现纯四层透明代理（默认端口 22026） | 性能优异，保留真实源 IP，适合现代 Linux 内核 |
+| **REDIR-TPROXY** | `sing-box@redir-tproxy` | TCP 使用 REDIRECT（端口 22025），UDP 使用 TPROXY（端口 22026） | 兼容老旧内核或特定需要 TCP REDIRECT 的软路由环境 |
+| **SOCKS** | `sing-box@socks` | 启动本地 Mixed (SOCKS5/HTTP) 代理端口（默认 20080） | 本地或局域网客户端显式代理，不修改系统路由 |
 
-## 项目结构
+---
 
-```
-.
-├── main.go                 CLI + 守护进程入口
-├── internal/               Go 实现（systemd 或容器进程后端 / nft、ip 规则 / API + SSE）
-├── web/                    Vue 3 前端（@material/web 组件 + MD3 Glass 样式）
-│   ├── src/                源码（App 外壳 + 三个视图）
-│   └── dist/               构建产物（占位页入库，真实产物本地 npm run build）
-├── deploy.sh               一键打包、部署与卸载管理脚本
-├── deploy/                 Linux 目录映射物料（etc, opt, usr, var）
-├── container/              容器入口脚本与默认配置
-├── Dockerfile              Rocky Linux 9 容器镜像
-├── docker-compose.yml      本地容器运行配置
-├── build.sh                原生二进制 / 容器镜像构建
-└── google-md3-glass-design.md 前端设计规范
-```
+## 🎨 前端设计美学：Google MD3 + Glass
 
-## 从源码构建（git clone 之后）
+前端遵循 [google-md3-glass-design.md](google-md3-glass-design.md) 规范，将 Google Material Design 3 的语义清晰度与通透的玻璃拟态（Glassmorphism）氛围深度融合：
 
-前置：**Go ≥ 1.22**（必须）、**Node.js ≥ 18 + npm**（仅构建前端需要；仓库自带占位页，不构建前端也能编译出可用的后端二进制）。
+> **"Material You — but make it breathe."**
 
+* **视觉体系**：以经典紫罗兰 `#6750A4` 为种子色，动态生成 Material 3 调色板；背景铺设三颗动态呼吸光斑，大屏呈现高级通透感。
+* **三层玻璃体系**：
+  * **一级：导航胶囊（Navigation Rail）** —— 极高通透感与悬浮感；
+  * **二级：内容卡片（Glass Card）** —— 柔和毛玻璃底色，不抢核心内容视觉；
+  * **三级：交互按键（Elevated / Tonal Buttons）** —— 搭配 MD3 水波纹（Ripple）微交互。
+* **状态芯片与可视化**：
+  * **运行状态**：Hero 摘要卡片实时反馈当前生效模式，统计芯片直观展示单元活跃态与内核规则状态（正常 / 缺失 / 残留）；
+  * **配置管理**：双栏编辑器，支持主配置文件实时校验与模式配置只读比对；
+  * **系统设置**：可视化分段调整 `manager.yaml` 参数（端口、排除 GID、路由 Mark、入站预设模板）。
+
+---
+
+## 🛠️ 从源码构建、测试预览与编译
+
+### 前置要求
+* **Go**：`>= 1.22`
+* **Node.js**：`>= 18` 与 `npm`（构建前端所需；二进制自带占位页，无 node 环境亦可编译基本后端）
+* **sing-box 内核**（可选）：放置于 `build/sing-box`（测试与打包时会自动探测）
+
+### 1. 克隆项目
 ```bash
 git clone git@github.com:vxzman/musicbox.git
 cd musicbox
-
-# 1. 构建前端（产物 web/dist 由后端 go:embed 内嵌）
-cd web && npm install && npm run build
-
-# 2. 编译后端（注入版本/编译时间/Git 提交，供 info 子命令展示）
-cd .. && go build -ldflags="-s -w \
-  -X main.version=$(git describe --tags --exact-match 2>/dev/null || echo dev) \
-  -X main.buildTime=$(date -u '+%Y-%m-%dT%H:%M:%SZ') \
-  -X main.gitCommit=$(git rev-parse --short HEAD 2>/dev/null || echo unknown)" -o musicbox .
 ```
 
-产物为根目录下单一二进制 `musicbox`，可用 `./musicbox info` 查看版本与内嵌前端状态。
-
-> `web/dist/` 中保留了占位 `index.html`，未构建前端时 `go build` 也能通过（二进制将显示"前端尚未构建"提示页）。
-> 目标机装有 Go 时也可直接 `sudo ./deploy.sh --install`，它会自动完成上述构建与部署。
-
-## 部署到服务器（免编译，上传哪些文件）
-
-前置：目标机已安装内核 `sudo cp sing-box /usr/local/bin/sing-box`。
-
-**首次部署上传 4 个文件**：
-
-| 文件（deploy/ 映射目录） | 目标位置 |
-|---|---|
-| `deploy/usr/local/bin/musicbox`（已编译二进制，前端已内嵌） | `/usr/local/bin/musicbox` |
-| `deploy/etc/systemd/system/sing-box@.service` | `/etc/systemd/system/sing-box@.service` |
-| `deploy/etc/systemd/system/musicbox.service` | `/etc/systemd/system/musicbox.service` |
-| `deploy/etc/sing-box/config_generic.json`（模板配置） | `/etc/sing-box/config_generic.json` |
-| `deploy/opt/musicbox/manager.yaml`（系统设置） | `/opt/musicbox/manager.yaml` |
+### 2. Web 前端开发与测试预览
+开发阶段可享受 Vite 带来的毫秒级热更新，同时使用 `deploy/` 下的 Linux 映射配置启动本地模拟后端：
 
 ```bash
-# 1. 本机一键打包（自动附加时间戳，产物为 musicbox-deploy-<version>-<timestamp>.tar.gz）
+# 终端 1：启动本地模拟后端（使用 deploy 映射配置，监听 0.0.0.0:8082）
+MUSICBOX_CONFIG=$PWD/deploy/opt/musicbox/manager.yaml go run . serve
+
+# 终端 2：启动前端开发热更新服务器（代理 API 请求到 :8082）
+cd web
+npm install
+npm run dev
+```
+浏览器打开 `http://localhost:5173` 即可进行前端界面实时调试与预览。
+
+### 3. 编译普通二进制（Host 环境）
+使用根目录构建脚本一键完成前端打包与后端编译注入：
+```bash
+./build.sh binary
+```
+编译产物输出至 **`build/musicbox`**，前端静态资源已完全内嵌进单一二进制中。可以通过如下命令查看构建元数据：
+```bash
+./build/musicbox info
+```
+
+### 4. 编译容器版本与 Docker 镜像
+在具备容器构建环境（Docker 或 Podman）的机器上，可一键完成双二进制、Rocky Linux 9 容器镜像与离线包构建：
+```bash
+# 准备目标架构的 sing-box 内核（若已有）
+mkdir -p build && cp /path/to/sing-box build/sing-box
+
+# 编译容器版独立进程二进制、构建镜像并生成 tar 归档
+./build.sh container
+```
+构建产物包括：
+* `build/musicbox`（Host systemd 版）
+* `build/musicbox-container`（带 `-tags container` 的独立进程版）
+* Docker 镜像 `localhost/musicbox:latest`
+* 离线归档包 `build/musicbox-<version>-<arch>-<timestamp>.tar.gz`
+
+---
+
+## 🚀 普通二进制部署（宿主机原生环境）
+
+MusicBox 采用类似标准 Linux 根文件系统的映射目录结构（`deploy/`），并提供统一的一键部署脚本 [deploy.sh](deploy.sh)。
+
+### 方案 A：一键打包与安装部署（推荐，免目标机编译环境）
+
+#### 1. 在开发机上一键打包
+在本地开发机执行打包命令，脚本会自动将编译产物复制至 Linux 映射结构并打成带有时间戳的压缩包：
+```bash
 ./deploy.sh --pack
-
-# 2. 上传安装包至服务器
-scp musicbox-deploy-*.tar.gz 服务器:/tmp/
-
-# 3. 在服务器解压并一键部署（含创建用户、目录权限、二进制与服务安装、开机自启）
-ssh 服务器
-cd /tmp && tar xzf musicbox-deploy-*.tar.gz
-sudo ./deploy.sh --install
-# 或直接指定 --file 部署: sudo ./deploy.sh --install --file /tmp/musicbox-deploy-*.tar.gz
-
-# 卸载清理（如需完全移除服务器文件与服务）:
-# sudo ./deploy.sh --remove
 ```
+产物统一生成于 **`build/musicbox-deploy-<version>-<timestamp>.tar.gz`**（包内含二进制、服务单元、配置文件模板与部署脚本）。
 
-手动安装等效命令：
-
+#### 2. 上传安装包至目标服务器
 ```bash
-sudo install -m 0755 /tmp/musicbox /usr/local/bin/musicbox
-sudo cp /tmp/deploy/sing-box@.service /tmp/deploy/musicbox.service /etc/systemd/system/
-sudo mkdir -p /etc/sing-box && sudo cp /tmp/deploy/etc-sing-box/config_generic.json /etc/sing-box/
-sudo useradd --system --shell /usr/sbin/nologin --home-dir /var/lib/sing-box --no-create-home sing-box
-sudo mkdir -p /var/lib/sing-box /var/log/sing-box && sudo chown sing-box:sing-box /var/lib/sing-box /var/log/sing-box
-sudo systemctl daemon-reload && sudo systemctl enable --now musicbox
+scp build/musicbox-deploy-*.tar.gz root@<server_ip>:/tmp/
 ```
 
-**日常更新只传 1 个文件**：
-
+#### 3. 在目标服务器上一键安装部署
+登录服务器并直接指定部署包进行一键安装：
 ```bash
-scp musicbox 服务器:/tmp/
-ssh 服务器 'sudo install -m 0755 /tmp/musicbox /usr/local/bin/musicbox && sudo systemctl restart musicbox'
+ssh root@<server_ip>
+sudo ./deploy.sh --install --file /tmp/musicbox-deploy-*.tar.gz
 ```
+> **部署脚本全自动完成**：
+> 1. 检查并创建专用系统用户与组 `sing-box`；
+> 2. 初始化 `/etc/sing-box`、`/var/lib/sing-box`、`/var/log/sing-box`、`/opt/musicbox` 等目录并正确设置权限；
+> 3. 安装 `musicbox` 与 `sing-box` 到 `/usr/local/bin/` 并赋予必要能力（Capability）；
+> 4. 安装现代格式配置模板，并自动匹配检测到的 `sing-box` 用户组 GID 到 `manager.yaml`；
+> 5. 安装 `musicbox.service` 与 `sing-box@.service` 服务单元；
+> 6. 重载 systemd 并启动 `musicbox.service` 开机自启。
 
-安装后检查：`/opt/musicbox/manager.yaml` 里 tproxy/redir-tproxy 的 `exclude_gid` 与 `id -g sing-box` 一致（不一致会环路），可在面板「系统设置」修改。
-
-### 模式配置说明（面板「系统设置」→ 各模式标签页）
-
-- **socks**：只填「入站端口」，保存后写入 `config_socks.json` 的 mixed 入站（mixed-in）`listen_port`，其余字段由预定义入站模板维护。
-
-自管模式（preset 与 endpoints 均为空）不参与配置生成：管理器不生成、不覆盖，启停前需先放置好配置文件。
-
-## 监听地址与 IPv6（安全说明）
-
-面板无鉴权，**默认仅监听 IPv4**（`0.0.0.0:8082`，不暴露 IPv6）。在 manager.yaml 中调整：
-
-- 仅本机访问：`web_addr: "127.0.0.1:8082"`
-- 显式启用 IPv6：`web_addr: "[::]:8082"`（仅 IPv6）或 `":8082"`（双栈，含 IPv4）
-
-修改后 `sudo systemctl restart musicbox` 生效（也可在面板「系统设置」修改）。
-
-## nginx 反向代理配置示例
-
-面板（`http://<host>:8082`）无内置鉴权，公网暴露建议经 nginx 反代并加 Basic Auth：
-
-```nginx
-server {
-    listen 80;
-    server_name musicbox.example.com;
-
-    # 可选：面板无鉴权，建议开启 Basic Auth（先 htpasswd -c /etc/nginx/.htpasswd 用户名）
-    # auth_basic "MusicBox";
-    # auth_basic_user_file /etc/nginx/.htpasswd;
-
-    location / {
-        proxy_pass http://127.0.0.1:8082;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-
-        # SSE 实时状态推送必须：关闭缓冲、放宽读超时
-        proxy_buffering off;
-        proxy_cache off;
-        proxy_read_timeout 1h;
-        proxy_send_timeout 1h;
-        proxy_set_header Connection '';
-    }
-}
-```
-
-HTTPS 用 certbot 免费证书：
-
+#### 4. 卸载与清理（如需）
 ```bash
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d musicbox.example.com
+sudo ./deploy.sh --remove
+# 如需保留 sing-box 内核或配置目录：
+# sudo ./deploy.sh --remove --keep-singbox --keep-config
 ```
 
-## 常用命令
+---
 
+### 方案 B：手动文件部署说明（Linux 目录映射参考）
+
+若习惯纯手工放置文件，可参考 `deploy/` 的映射关系进行安装：
+
+| 本地映射路径 | 目标系统绝对路径 | 权限/所有者 | 描述 |
+|---|---|---|---|
+| `deploy/usr/local/bin/musicbox` | `/usr/local/bin/musicbox` | `0755 root:root` | MusicBox 控制平面主程序 |
+| `deploy/usr/local/bin/sing-box` | `/usr/local/bin/sing-box` | `0755 root:root` | sing-box 代理内核 |
+| `deploy/etc/systemd/system/musicbox.service` | `/etc/systemd/system/musicbox.service` | `0644 root:root` | Web 控制台与编排守护单元 |
+| `deploy/etc/systemd/system/sing-box@.service` | `/etc/systemd/system/sing-box@.service` | `0644 root:root` | 内核实例运行模板单元 |
+| `deploy/etc/sing-box/config_generic.json` | `/etc/sing-box/config_generic.json` | `0644 root:root` | 用户代理配置单一事实源 |
+| `deploy/opt/musicbox/manager.yaml` | `/opt/musicbox/manager.yaml` | `0644 root:root` | 系统编排与网络环境变量配置 |
+| 运行时数据目录 | `/var/lib/sing-box/` | `0750 sing-box:sing-box`| 内核缓存与数据目录 |
+| 运行时日志目录 | `/var/log/sing-box/` | `0750 sing-box:sing-box`| 日志目录 |
+
+手动启动服务命令：
 ```bash
-sudo musicbox info                 # 版本/编译时间/Git 提交/平台/内嵌前端（鉴别是否最新构建）
-sudo musicbox tun start            # 启动模式（tun|tproxy|redir-tproxy|socks）
-sudo musicbox tproxy stop          # 停止（规则自动清理）
-sudo musicbox status               # 各模式/单元/规则状态
-sudo musicbox config sync          # 重新生成各模式配置（配置校验）
+sudo systemctl daemon-reload
+sudo systemctl enable --now musicbox.service
 ```
 
-## 容器运行与部署
-
-容器版用 `go build -tags container` 编译独立进程后端，镜像基于 **Rocky Linux 9**，无需 systemd / D-Bus，由 MusicBox 直接管理 `sing-box` 子进程和 nft/ip 规则。
-
-构建前把目标架构的 `sing-box` 二进制放到 `build/sing-box`（或设 `SINGBOX_BIN`）：
-
+### 日常热更新
+二进制内置前端，日常迭代更新只需上传单一文件并重启服务：
 ```bash
-mkdir -p build
-cp /path/to/sing-box build/sing-box
-chmod 0755 build/sing-box
-
-./build.sh binary             # build/musicbox + build/musicbox-container
-./build.sh container          # 两个二进制 + Rocky 镜像 + tar.gz
-./build.sh all                # 同 container
+scp build/musicbox root@<server_ip>:/usr/local/bin/musicbox
+ssh root@<server_ip> 'systemctl restart musicbox'
 ```
 
-> **容器回环避免必须用 routing_mark。** 容器内以 root 跑 sing-box，没有专有 GID，不能用 `meta skgid`。默认镜像已在 `config_generic.json` 写入 `route.default_mark: 6666`，并在 `manager.yaml` 把 TPROXY / REDIR-TPROXY 设为 `routing_mark: 6666`。若改回 GID 方式会导致流量回环。
+### 命令行常用操作
+除了 Web 面板，亦可直接通过命令行管理：
+```bash
+sudo musicbox info                 # 查看当前版本、Git提交与内嵌前端状态
+sudo musicbox status               # 查看各模式实例及网络规则活跃状态
+sudo musicbox tun start            # 启动 TUN 模式（支持 tun|tproxy|redir-tproxy|socks）
+sudo musicbox tun stop             # 停止模式并自动清理对应规则
+sudo musicbox config sync          # 基于通用配置重新校验并生成各模式配置
+```
 
-### Docker Compose（host 网络）
+---
 
+## 🐳 容器化部署（Docker / Compose）
+
+容器版本使用 `musicbox-container` 独立进程后端运行于 **Rocky Linux 9** 基础镜像之上，无需依赖宿主机 systemd 或 D-Bus，由 MusicBox 直接接管 `sing-box` 子进程生命周期与 iptables/nftables 规则。
+
+> ⚠️ **容器环境关键注意事项**：
+> 1. **必须使用 Host 网络与特权模式**：透明代理需要操作宿主机网络栈，必须指定 `--net=host`（`network_mode: host`）与 `--privileged`；
+> 2. **回环避免必须使用 `routing_mark`**：容器中以 root 运行 sing-box，没有专有的宿主机 GID，因此**严禁使用 `meta skgid`**。默认镜像在 `config_generic.json` 中配置了 `route.default_mark: 6666`，并在 `manager.yaml` 中将 `routing_mark` 设为 `6666`。
+
+### 1. 使用 Docker Compose（推荐）
+
+直接使用项目根目录的 [docker-compose.yml](docker-compose.yml)：
+
+```yaml
+services:
+  musicbox:
+    image: localhost/musicbox:latest
+    container_name: musicbox
+    restart: unless-stopped
+    network_mode: host
+    privileged: true
+    volumes:
+      - /opt/musicbox/config:/etc/sing-box
+      - /opt/musicbox/data:/var/lib/sing-box
+      - /opt/musicbox/manager:/opt/musicbox
+```
+
+启动与日志监控：
 ```bash
 docker compose up -d
 docker compose logs -f
 ```
 
-透明代理需要操作宿主机 nftables / 策略路由，因此使用 `network_mode: host` 和 `privileged: true`。
-
-### docker run
+### 2. 使用 `docker run` 直接运行
 
 ```bash
 docker run -d \
@@ -238,18 +241,96 @@ docker run -d \
   localhost/musicbox:latest
 ```
 
-面板默认 `http://<host>:8082`。
+容器启动后，即可在浏览器访问 `http://<服务器IP>:8082`。
 
-## 本地开发与测试
- 
-```bash
-# 启动守护进程（指定 deploy 映射配置，面板 :8082）
-MUSICBOX_CONFIG=$PWD/deploy/opt/musicbox/manager.yaml go run . serve
+---
 
-# 前端开发热更新（另开终端，vite 代理到 :8082）
-cd web && npm run dev
+## 🔒 安全与反向代理
+
+### 1. 监听安全说明
+Web 控制面板默认**不设强制鉴权**，出于安全考虑：
+* **默认仅监听 IPv4**（`0.0.0.0:8082`），不暴露外部未保护的 IPv6；
+* 如需仅限本机回环访问，可在面板「系统设置」或 `/opt/musicbox/manager.yaml` 中修改：
+  ```yaml
+  daemon:
+    web_addr: "127.0.0.1:8082"
+  ```
+* 修改后执行 `sudo systemctl restart musicbox`（或容器重启）生效。
+
+### 2. Nginx 反向代理配置（带 Basic Auth 与 SSE 优化）
+
+若需将面板暴露于公网，强烈建议通过 Nginx 进行反向代理并开启密码认证（Basic Auth）。由于面板使用了 **SSE（Server-Sent Events）** 实时推送状态，需对反代缓冲区与超时进行配置：
+
+```nginx
+server {
+    listen 80;
+    server_name musicbox.example.com;
+
+    # 启用 HTTP 基本认证（通过 htpasswd -c /etc/nginx/.htpasswd 用户名 生成）
+    auth_basic "MusicBox Control Panel";
+    auth_basic_user_file /etc/nginx/.htpasswd;
+
+    location / {
+        proxy_pass http://127.0.0.1:8082;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # SSE 实时状态推送关键配置：关闭缓冲、放宽读写超时
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 24h;
+        proxy_send_timeout 24h;
+        proxy_set_header Connection '';
+    }
+}
 ```
 
-## License
+---
+
+## 📂 项目结构全景
+
+```
+.
+├── main.go                     # CLI 命令行与守护进程主入口
+├── build.sh                    # 原生双二进制与 Rocky Linux 容器构建脚本
+├── deploy.sh                   # 一键打包 (--pack)、部署 (--install) 与卸载 (--remove) 脚本
+├── google-md3-glass-design.md  # 前端 Google MD3 + Glass 视觉规范
+├── docker-compose.yml          # 容器编排部署配置
+├── Dockerfile                  # Rocky Linux 9 容器构建清单
+├── deploy/                     # Linux 标准系统目录映射（用于测试、模拟与一键打包）
+│   ├── etc/
+│   │   ├── sing-box/           # 配置文件模板 (config_generic.json, 各模式参考配置, kernel-proxy)
+│   │   └── systemd/system/     # 服务单元模板 (musicbox.service, sing-box@.service)
+│   ├── opt/musicbox/           # 系统设置模板 (manager.yaml)
+│   ├── usr/local/bin/          # 二进制文件落位与打包目录
+│   └── var/lib/sing-box/       # 运行数据目录占位
+├── internal/                   # 核心实现逻辑
+│   ├── api/                    # RESTful 控制接口与 SSE 事件流
+│   ├── cli/                    # 命令行控制逻辑
+│   ├── config/                 # 配置模型加载、合并、校验 (sing-box 1.14 兼容)
+│   ├── intercept/              # nftables / 策略路由编排与回环避免核心
+│   ├── lifecycle/              # 模式同生共死生命周期状态机
+│   ├── netlink/                # Linux Netlink 路由与网络事件通信
+│   ├── server/                 # HTTP/SSE 服务端装配
+│   └── systemd/                # systemd D-Bus 实例交互后端
+├── web/                        # Vue 3 前端工程
+│   ├── src/                    # 前端源码（基于 @material/web 与 MD3 玻璃风样式）
+│   └── dist/                   # 前端编译产物（由 Go 二进制内嵌）
+├── container/                  # 容器专用初始化与默认配置
+└── bash-scripts/               # 早期纯 Bash 参考实现脚本与工具归档
+```
+
+---
+
+## 📜 附录：历史参考脚本
+
+在 [bash-scripts/](bash-scripts/) 目录中完整保留了早期纯 Shell 版本的透明代理与服务管理脚本实现（`sing-box-ctl`、`tproxy.sh`、`redir-tproxy.sh` 等），适合需要脱离 Go 守护进程直接在极简环境下调试规则的高级用户参考。
+
+---
+
+## 📄 License
 
 [MIT](LICENSE) © 2026 vxzman

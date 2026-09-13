@@ -12,9 +12,6 @@ web/node_modules/
 web/dist/*
 !web/dist/index.html
 
-# ─── 旧版 bash 参考实现（不随发布提供）───────
-bash/
-bash-scripts/
 
 # ─── 内部文档（不随发布提供）─────────────────
 PLAN.md

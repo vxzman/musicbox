@@ -97,15 +97,20 @@ cd .. && go build -ldflags="-s -w \
 | `deploy/etc-sing-box/config_generic.json`（模板配置） | `/etc/sing-box/` |
 
 ```bash
-# 本机打包
-tar czf /tmp/mb-dist.tar.gz musicbox deploy/
+# 1. 本机一键打包（自动附加时间戳，产物为 musicbox-deploy-<version>-<timestamp>.tar.gz）
+./deploy.sh --pack
 
-# 上传并安装
-scp /tmp/mb-dist.tar.gz 服务器:/tmp/
+# 2. 上传安装包至服务器
+scp musicbox-deploy-*.tar.gz 服务器:/tmp/
+
+# 3. 在服务器解压并一键部署（含创建用户、目录权限、二进制与服务安装、开机自启）
 ssh 服务器
-cd /tmp && tar xzf mb-dist.tar.gz        # 解出 /tmp/musicbox + /tmp/deploy/
-sudo /tmp/deploy/deploy.sh copy          # 装二进制+单元+建用户+启动守护
-# 旧版本升级改用: sudo /tmp/deploy/deploy.sh upgrade（自动迁移配置）
+cd /tmp && tar xzf musicbox-deploy-*.tar.gz
+sudo ./deploy.sh --install
+# 或直接指定 --file 部署: sudo ./deploy.sh --install --file /tmp/musicbox-deploy-*.tar.gz
+
+# 卸载清理（如需完全移除服务器文件与服务）:
+# sudo ./deploy.sh --remove
 ```
 
 手动安装等效命令：

@@ -50,7 +50,7 @@ async function load() {
   loading.value = true
   message.value = null
   try {
-    fileName.value = `config_${target.value}.json`
+    fileName.value = target.value === 'general' ? 'config_generic.json' : `config_${target.value}.json`
     content.value = target.value === 'general' ? await fetchGeneral() : await fetchModeConfig(target.value)
   } catch (e) {
     message.value = { ok: false, text: (e as Error).message }

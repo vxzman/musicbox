@@ -1,6 +1,6 @@
 [Unit]
 Description=MusicBox - web panel and mode lifecycle daemon
-After=network.target
+After=network.target network-online.target
 Wants=network.target
 
 [Service]
@@ -14,16 +14,8 @@ StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=musicbox
 
-# 需要 CAP_NET_ADMIN（nft 表读写、ip rule）、CAP_NET_RAW；
-# CAP_SETUID/CAP_SETGID 供 runuser 降权执行配置校验
-CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW CAP_CHOWN CAP_DAC_OVERRIDE CAP_FOWNER CAP_KILL CAP_SETUID CAP_SETGID
-AmbientCapabilities=CAP_NET_ADMIN CAP_NET_RAW
-NoNewPrivileges=true
-ProtectSystem=strict
-ReadWritePaths=/etc/sing-box /var/lib/sing-box /opt/musicbox /run/musicbox
 RuntimeDirectory=musicbox
 RuntimeDirectoryMode=0750
-PrivateTmp=true
 LimitNOFILE=65536
 
 [Install]

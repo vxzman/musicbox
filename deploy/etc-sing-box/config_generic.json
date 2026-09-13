@@ -7,12 +7,17 @@
     "servers": [
       {
         "tag": "remote",
-        "address": "https://1.1.1.1/dns-query",
+        "type": "https",
+        "server": "1.1.1.1",
+        "server_port": 443,
+        "path": "/dns-query",
         "detour": "proxy"
       },
       {
         "tag": "local",
-        "address": "223.5.5.5",
+        "type": "udp",
+        "server": "223.5.5.5",
+        "server_port": 53,
         "detour": "direct"
       }
     ],
@@ -71,10 +76,11 @@
     }
   ],
   "route": {
+    "default_domain_resolver": "local",
     "rules": [
       {
         "protocol": "dns",
-        "outbound": "dns-out"
+        "action": "hijack-dns"
       },
       {
         "outbound": "direct"

@@ -2,6 +2,7 @@
 /musicbox
 /singbox-manager
 /build/
+*.tar.gz
 
 # ─── 前端 ───────────────────────────────────
 web/node_modules/
@@ -19,6 +20,7 @@ dev/etc-sing-box/config_*.json
 
 # ─── 旧版 bash 参考实现（不随发布提供）───────
 bash/
+bash-scripts/
 
 # ─── 内部文档（不随发布提供）─────────────────
 PLAN.md
@@ -30,5 +32,6 @@ PLAN.md
 .DS_Store
 *.log
 *.swp
+grok.txt
 # 根目录遗留的空 package-lock（前端锁文件在 web/ 内，正常入库）
 /package-lock.json

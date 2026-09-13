@@ -393,11 +393,21 @@ func (m *Manager) Status(ctx context.Context) *Status {
 		}
 		switch name {
 		case "tproxy", "redir-tproxy":
-			ms.Rules = "missing"
+			applied := false
 			if ic, ok := m.interceptConfig(name); ok {
-				if applied, err := ic.RulesApplied(); err == nil && applied {
-					ms.Rules = "present"
+				if a, err := ic.RulesApplied(); err == nil {
+					applied = a
 				}
+			}
+			switch {
+			case applied && ms.Active:
+				ms.Rules = "present" // 运行中，规则已就位
+			case applied:
+				ms.Rules = "leftover" // 已停止但规则残留
+			case ms.Active:
+				ms.Rules = "missing" // 运行中但规则缺失
+			default:
+				ms.Rules = "clean" // 已停止且无残留
 			}
 		case "tun":
 			// tun 运行时 sing-box 自己会向路由表加规则（auto-route 的正常行为），
@@ -425,9 +435,18 @@ func (m *Manager) Status(ctx context.Context) *Status {
 		if !ok {
 			continue
 		}
+		wasActive := ms.Active
 		ms.Active = true
 		if ms.UnitState != "active" && ms.UnitState != "activating" && ms.UnitState != "reloading" {
 			ms.UnitState = "active"
+		}
+		if !wasActive {
+			switch ms.Rules {
+			case "clean":
+				ms.Rules = "missing"
+			case "leftover":
+				ms.Rules = "present"
+			}
 		}
 		st.Modes[inst] = ms
 	}

@@ -40,9 +40,22 @@ const rulesText: Record<string, string> = {
   na: '不适用',
 }
 
+function getRuleKey(m: ModeStatus): string {
+  if (!m.active && m.rules === 'missing') {
+    return 'clean'
+  }
+  return m.rules
+}
+
+function rulesTextFor(m: ModeStatus): string {
+  const r = getRuleKey(m)
+  return rulesText[r] ?? r
+}
+
 function rulesClass(m: ModeStatus): string {
-  if (m.rules === 'present' || m.rules === 'clean') return 'active'
-  if (m.rules === 'missing' || m.rules === 'leftover') return 'partial'
+  const r = getRuleKey(m)
+  if (r === 'present' || r === 'clean') return 'active'
+  if (r === 'missing' || r === 'leftover') return 'partial'
   return ''
 }
 
@@ -123,7 +136,7 @@ function unitClass(s: string): string {
             {{ unitText[m.unit_state] ?? m.unit_state }}
           </span>
           <span class="chip chip--small rules-chip" :class="{ 'chip--ok': rulesClass(m) === 'active', 'chip--warn': rulesClass(m) === 'partial' }">
-            {{ rulesText[m.rules] ?? m.rules }}
+            {{ rulesTextFor(m) }}
           </span>
         </div>
 

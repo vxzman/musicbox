@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -218,17 +217,7 @@ func buildModeConfig(general map[string]interface{}, preset, endpoints string) (
 	return json.MarshalIndent(cfg, "", "  ")
 }
 
-// firstLine 截取输出首行：降权失败日志只留原因，不让整段输出刷屏。
-func firstLine(out []byte) string {
-	s := strings.TrimSpace(string(out))
-	if i := strings.IndexByte(s, '\n'); i >= 0 {
-		return s[:i]
-	}
-	return s
-}
-
-// testSingBoxConfig 用 sing-box check 校验配置；机器上没有 sing-box（如 CI）则跳过。
-// 老面板的做法：root 时以 sing-box 用户身份执行（权限问题在校验期暴露）。
+// testSingBoxConfig 用 sing-box check 校验配置语法；机器上没有 sing-box（如 CI）则跳过。
 // 防挂起：整个校验包在 20s 超时内。
 func testSingBoxConfig(c *ManagerConfig, content string) error {
 	bin, err := exec.LookPath("sing-box")
@@ -241,13 +230,6 @@ func testSingBoxConfig(c *ManagerConfig, content string) error {
 		return err
 	}
 	defer os.RemoveAll(tmpDir)
-
-	// MkdirTemp 目录默认 0700，root 下 runuser 降权后 sing-box 用户
-	// 无法进入目录读取配置（read config ... permission denied）；
-	// 放宽为 0755（目录名随机，无泄密风险，配置内容本就是明文 JSON）。
-	if err := os.Chmod(tmpDir, 0755); err != nil {
-		return err
-	}
 
 	tmpFile := filepath.Join(tmpDir, "config.json")
 	if err := os.WriteFile(tmpFile, []byte(content), 0644); err != nil {
@@ -263,31 +245,17 @@ func testSingBoxConfig(c *ManagerConfig, content string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	// root 时优先以 sing-box 用户身份降权校验（权限问题在校验期暴露，
-	// 老面板的做法）。能力集受限（无 CAP_SETUID/SETGID）时 runuser 会失败，
-	// 降级为 root 直接校验，不让校验阻塞配置保存。
-	if os.Geteuid() == 0 {
-		if _, err := exec.LookPath("runuser"); err == nil {
-			cmd := exec.CommandContext(ctx, "runuser", "-u", "sing-box", "--", bin, "check", "-D", workDir, "-c", tmpFile)
-			out, err := cmd.CombinedOutput()
-			if err == nil {
-				return nil
-			}
-			if ctx.Err() == context.DeadlineExceeded {
-				return fmt.Errorf("配置校验超时（20s）")
-			}
-			log.Printf("[config] runuser 降权校验不可用，改用 root 校验: %v（%s）",
-				err, strings.TrimSpace(firstLine(out)))
-		}
-	}
-
 	cmd := exec.CommandContext(ctx, bin, "check", "-D", workDir, "-c", tmpFile)
 	out, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
 		return fmt.Errorf("配置校验超时（20s）")
 	}
 	if err != nil {
-		return fmt.Errorf("%s", strings.TrimSpace(string(out)))
+		msg := strings.TrimSpace(string(out))
+		if msg != "" {
+			return fmt.Errorf("%s", msg)
+		}
+		return fmt.Errorf("执行 %s check 失败: %w", bin, err)
 	}
 	return nil
 }

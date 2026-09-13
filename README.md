@@ -8,7 +8,7 @@
 
 ## ✨ 界面
 
-前端遵循 [Google MD3 + Glass 设计美学](<Google MD3 + Glass（玻璃氛围版）设计美学.md>)：紫罗兰 `#6750A4` 种子色、三颗光斑氛围层、三层玻璃体系（导航胶囊 / 玻璃卡片 / 涟漪按钮），"Material You — but make it breathe."
+前端遵循 [Google MD3 + Glass 设计美学](google-md3-glass-design.md)：紫罗兰 `#6750A4` 种子色、三颗光斑氛围层、三层玻璃体系（导航胶囊 / 玻璃卡片 / 涟漪按钮），"Material You — but make it breathe."
 
 - **运行状态**：模式摘要 Hero、统计条、模式启停列表（单元状态 + 规则状态芯片，SSE 秒级刷新）
 - **配置管理**：双栏编辑器，`config_generic.json` 是编辑入口，各模式配置只读预览
@@ -51,13 +51,13 @@ musicbox                       单一二进制
 ├── web/                    Vue 3 前端（@material/web 组件 + MD3 Glass 样式）
 │   ├── src/                源码（App 外壳 + 三个视图）
 │   └── dist/               构建产物（占位页入库，真实产物本地 npm run build）
-├── deploy/                 部署物料：deploy.sh + systemd 单元 + 配置模板
+├── deploy.sh               一键打包、部署与卸载管理脚本
+├── deploy/                 Linux 目录映射物料（etc, opt, usr, var）
 ├── container/              容器入口脚本与默认配置
 ├── Dockerfile              Rocky Linux 9 容器镜像
 ├── docker-compose.yml      本地容器运行配置
 ├── build.sh                原生二进制 / 容器镜像构建
-├── dev/                    本地开发夹具（dev/run.sh 启动，不碰系统路径）
-└── Google MD3 + Glass（玻璃氛围版）设计美学.md   前端设计规范
+└── google-md3-glass-design.md 前端设计规范
 ```
 
 ## 从源码构建（git clone 之后）
@@ -240,11 +240,14 @@ docker run -d \
 
 面板默认 `http://<host>:8082`。
 
-## 本地开发
-
+## 本地开发与测试
+ 
 ```bash
-./dev/run.sh                # 守护进程（dev fixture，不碰系统路径），面板 :8082
-cd web && npm run dev       # 前端热更新（vite 代理到 :8082）
+# 启动守护进程（指定 deploy 映射配置，面板 :8082）
+MUSICBOX_CONFIG=$PWD/deploy/opt/musicbox/manager.yaml go run . serve
+
+# 前端开发热更新（另开终端，vite 代理到 :8082）
+cd web && npm run dev
 ```
 
 ## License

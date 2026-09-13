@@ -12,14 +12,6 @@ web/node_modules/
 web/dist/*
 !web/dist/index.html
 
-# ─── 开发夹具（本地） ────────────────────────
-dev/*.sock
-dev/musicbox.sock
-dev/singbox-manager.sock
-# 由 config sync 生成的模式配置不入库，仅保留模板
-dev/etc-sing-box/config_*.json
-!dev/etc-sing-box/config_generic.json
-
 # ─── 旧版 bash 参考实现（不随发布提供）───────
 bash/
 bash-scripts/
@@ -34,6 +26,7 @@ PLAN.md
 .DS_Store
 *.log
 *.swp
+*.sock
 grok.txt
 # 根目录遗留的空 package-lock（前端锁文件在 web/ 内，正常入库）
 /package-lock.json
